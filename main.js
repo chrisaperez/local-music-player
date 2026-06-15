@@ -1,0 +1,148 @@
+'use strict';
+const path = require('path');
+const fs = require('fs');
+const { app, BrowserWindow, ipcMain, nativeTheme, dialog, Menu, nativeImage } = require('electron');
+const protocols = require('./src/main/protocols');
+const library = require('./src/main/library');
+const store = require('./src/main/store');
+
+// Privileged scheme registration must happen before the app is ready.
+protocols.registerPrivileged();
+
+let mainWindow = null;
+let nowPlaying = { title: null, artist: null, playing: false };
+
+function sendControl(action) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('dock:control', action);
+}
+
+// macOS Dock right-click menu with transport controls (Spotify-style).
+function buildDockMenu() {
+  if (process.platform !== 'darwin' || !app.dock) return;
+  const items = [];
+  if (nowPlaying.title) {
+    items.push({ label: nowPlaying.title + (nowPlaying.artist ? ' — ' + nowPlaying.artist : ''), enabled: false });
+    items.push({ type: 'separator' });
+  }
+  items.push({ label: nowPlaying.playing ? 'Pause' : 'Play', click: () => sendControl('playpause') });
+  items.push({ label: 'Next', click: () => sendControl('next') });
+  items.push({ label: 'Previous', click: () => sendControl('prev') });
+  app.dock.setMenu(Menu.buildFromTemplate(items));
+}
+
+function effectiveTheme() {
+  const { theme } = store.getSettings();
+  return { source: theme, dark: nativeTheme.shouldUseDarkColors };
+}
+
+function createWindow() {
+  // Apply persisted theme preference to the OS-level theme source.
+  nativeTheme.themeSource = store.getSettings().theme || 'system';
+
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 820,
+    minWidth: 880,
+    minHeight: 560,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#121212' : '#ffffff',
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 16, y: 18 },
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  // Forward renderer console output to the terminal (useful for debugging).
+  mainWindow.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+    const src = sourceId ? sourceId.split('/').pop() : '';
+    console.log(`[renderer] ${message}${src ? ` (${src}:${line})` : ''}`);
+  });
+  mainWindow.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[renderer] process gone:', details.reason);
+  });
+}
+
+// Notify renderer when the system theme flips (only matters in 'system' mode).
+nativeTheme.on('updated', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('theme:updated', effectiveTheme());
+  }
+});
+
+app.whenReady().then(() => {
+  protocols.handle();
+  createWindow();
+  buildDockMenu();
+
+  // Show the custom CD icon in the Dock even when running in dev (npm start).
+  try {
+    const iconPng = path.join(__dirname, 'build', 'icon-1024.png');
+    if (process.platform === 'darwin' && app.dock && fs.existsSync(iconPng)) {
+      app.dock.setIcon(nativeImage.createFromPath(iconPng));
+    }
+  } catch (e) { /* non-fatal */ }
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+
+// ---- IPC ----------------------------------------------------------------
+
+ipcMain.handle('library:get', async () => {
+  const { libraryRoot } = store.getSettings();
+  return library.scan(libraryRoot);
+});
+
+ipcMain.handle('library:rescan', async () => {
+  const { libraryRoot } = store.getSettings();
+  return library.scan(libraryRoot);
+});
+
+ipcMain.handle('settings:get', async () => store.getSettings());
+ipcMain.handle('settings:set', async (_e, patch) => store.setSettings(patch));
+
+ipcMain.handle('playlists:get', async () => store.getPlaylists());
+ipcMain.handle('playlists:save', async (_e, playlists) => store.setPlaylists(playlists));
+
+ipcMain.handle('history:get', async () => store.getHistory());
+ipcMain.handle('history:record', async (_e, play) => store.recordPlay(play));
+
+// Renderer reports what is playing so the Dock menu stays in sync.
+ipcMain.on('nowplaying:update', (_e, info) => {
+  nowPlaying = { title: info && info.title, artist: info && info.artist, playing: !!(info && info.playing) };
+  buildDockMenu();
+});
+
+ipcMain.handle('theme:get', async () => effectiveTheme());
+ipcMain.handle('theme:set', async (_e, theme) => {
+  const allowed = ['system', 'dark', 'light'];
+  const next = allowed.includes(theme) ? theme : 'system';
+  nativeTheme.themeSource = next;
+  store.setSettings({ theme: next });
+  return effectiveTheme();
+});
+
+ipcMain.handle('library:root', async () => {
+  const { libraryRoot } = store.getSettings();
+  return libraryRoot || library.defaultRoot();
+});
+
+ipcMain.handle('dialog:chooseFolder', async () => {
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose your music folder',
+    properties: ['openDirectory'],
+  });
+  if (res.canceled || !res.filePaths.length) return null;
+  store.setSettings({ libraryRoot: res.filePaths[0] });
+  return res.filePaths[0];
+});

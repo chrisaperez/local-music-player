@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' file:; img-src 'self' file: media: data: blob:; media-src media: blob: file:; style-src 'self' 'unsafe-inline' file:; script-src 'self' file:; font-src 'self' file:;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Music Player</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-theme="dark">
+  <div id="titlebar"></div>
+
+  <div id="app">
+    <aside id="sidebar">
+      <div class="brand">
+        <span class="brand-dot"></span> Music
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="songs">
+          <span class="ico">♫</span> Songs
+        </button>
+        <button class="nav-item" data-view="albums">
+          <span class="ico">▦</span> Albums
+        </button>
+        <button class="nav-item" data-view="artists">
+          <span class="ico">☻</span> Artists
+        </button>
+        <button class="nav-item" data-view="recent">
+          <span class="ico">✦</span> Recently Added
+        </button>
+        <button class="nav-item" data-view="recaps">
+          <span class="ico">◔</span> Recaps
+        </button>
+      </nav>
+
+      <div class="pl-header">Made For You</div>
+      <button class="nav-item onrepeat" id="onrepeat-item" data-view="onrepeat">
+        <span class="ico onrepeat-ico">⟲</span> On Repeat
+        <span class="pl-count" id="onrepeat-count"></span>
+      </button>
+      <button class="nav-item onrepeat" id="discover-item" data-view="discover">
+        <span class="ico onrepeat-ico">✦</span> Discover Mix
+        <span class="pl-count" id="discover-count"></span>
+      </button>
+
+      <div class="pl-header">
+        <span>Playlists</span>
+        <button id="new-playlist" title="New playlist">＋</button>
+      </div>
+      <ul id="playlist-list" class="playlist-list"></ul>
+
+      <div class="sidebar-footer">
+        <button id="rescan" class="rescan-btn">
+          <span class="ico">⟳</span> Rescan library
+        </button>
+        <div class="lib-path" id="lib-path" title="Click to change folder"></div>
+      </div>
+    </aside>
+
+    <main id="main">
+      <header id="topbar">
+        <div class="search">
+          <span class="search-ico">⌕</span>
+          <input id="search" type="search" placeholder="Search songs, artists, or albums" autocomplete="off" />
+        </div>
+        <div class="topbar-tools">
+          <div class="accent-wrap">
+            <button id="accent-btn" class="accent-btn" title="Accent color"><span class="accent-dot"></span></button>
+            <div id="accent-pop" class="accent-pop hidden"></div>
+          </div>
+          <div class="theme-seg" id="theme-seg" role="group" aria-label="Theme">
+            <button data-theme-choice="light" title="Light">☀</button>
+            <button data-theme-choice="system" title="Match system">◐</button>
+            <button data-theme-choice="dark" title="Dark">☾</button>
+          </div>
+        </div>
+      </header>
+
+      <section id="content" class="content"></section>
+    </main>
+  </div>
+
+  <footer id="player-bar">
+    <div class="np-left">
+      <img id="np-art" class="np-art" alt="" />
+      <div class="np-meta">
+        <div id="np-title" class="np-title">—</div>
+        <div id="np-artist" class="np-artist"></div>
+      </div>
+    </div>
+
+    <div class="np-center">
+      <div class="transport">
+        <button id="btn-shuffle" class="t-btn" title="Shuffle">⤮</button>
+        <button id="btn-prev" class="t-btn" title="Previous">⏮</button>
+        <button id="btn-play" class="t-btn play" title="Play/Pause">▶</button>
+        <button id="btn-next" class="t-btn" title="Next">⏭</button>
+        <button id="btn-repeat" class="t-btn" title="Repeat">⟲</button>
+      </div>
+      <div class="seek">
+        <span id="cur-time" class="time">0:00</span>
+        <input id="seek" class="seek-bar" type="range" min="0" max="1000" value="0" step="1" />
+        <span id="dur-time" class="time">0:00</span>
+      </div>
+    </div>
+
+    <div class="np-right">
+      <button id="btn-queue" class="t-btn queue-btn" title="Queue">☰</button>
+      <span class="vol-ico">🔊</span>
+      <input id="volume" class="vol-bar" type="range" min="0" max="1" value="1" step="0.01" />
+    </div>
+  </footer>
+
+  <aside id="queue-panel" class="queue-panel hidden"></aside>
+
+  <audio id="audio"></audio>
+  <div id="context-menu" class="context-menu hidden"></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 id="modal-title">New Playlist</h2>
+      <label>Name</label>
+      <input id="modal-name" type="text" maxlength="120" placeholder="My playlist" autocomplete="off" />
+      <label>Description <span id="modal-desc-count">0/500</span></label>
+      <textarea id="modal-desc" maxlength="500" rows="4" placeholder="Add an optional description…"></textarea>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn">Cancel</button>
+        <button id="modal-save" class="btn primary">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="player.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

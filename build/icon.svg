@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <clipPath id="squircle"><rect x="84" y="84" width="856" height="856" rx="214"/></clipPath>
+
+    <!-- silver CD (metallic, minimal rainbow) -->
+    <radialGradient id="disc" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.12" stop-color="#fbfcfe"/>
+      <stop offset="0.4" stop-color="#dfe5ee"/>
+      <stop offset="0.66" stop-color="#c2cad6"/>
+      <stop offset="0.86" stop-color="#a7b1bf"/>
+      <stop offset="1" stop-color="#8b95a4"/>
+    </radialGradient>
+    <linearGradient id="irid1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff7ab5"/><stop offset="0.25" stop-color="#ffe07a"/>
+      <stop offset="0.5" stop-color="#7affc0"/><stop offset="0.75" stop-color="#7ad4ff"/>
+      <stop offset="1" stop-color="#c79bff"/>
+    </linearGradient>
+    <radialGradient id="hub" cx="0.5" cy="0.4" r="0.62">
+      <stop offset="0" stop-color="#fbfdff"/><stop offset="0.7" stop-color="#c8d0db"/>
+      <stop offset="1" stop-color="#97a2b1"/>
+    </radialGradient>
+    <linearGradient id="discGloss" x1="0.1" y1="0" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="0.42" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="discClip"><circle cx="512" cy="512" r="343"/></clipPath>
+
+    <!-- translucent clear clamping ring ("washer") + cut-outs -->
+    <radialGradient id="washerGrad" cx="0.42" cy="0.38" r="0.72">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.6" stop-color="#dbe7f2" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#b9c6d6" stop-opacity="0.45"/>
+    </radialGradient>
+    <!-- mask: silver mirror is an annulus (centre r<115 cut out) -->
+    <mask id="discMask">
+      <circle cx="512" cy="512" r="343" fill="#fff"/>
+      <circle cx="512" cy="512" r="115" fill="#000"/>
+    </mask>
+    <!-- mask: washer is an annulus (transparent hole r<45) -->
+    <mask id="washerMask">
+      <circle cx="512" cy="512" r="115" fill="#fff"/>
+      <circle cx="512" cy="512" r="45" fill="#000"/>
+    </mask>
+    <!-- edge halo that leaves the centre clear so the hole stays transparent -->
+    <radialGradient id="haloGrad" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.55" stop-color="#06243d" stop-opacity="0"/>
+      <stop offset="0.88" stop-color="#06243d" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#06243d" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="discShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#04243d" flood-opacity="0.45"/>
+    </filter>
+    <filter id="blurBig"><feGaussianBlur stdDeviation="26"/></filter>
+  </defs>
+
+  <g clip-path="url(#squircle)">
+    <!-- Frutiger Aero photo: zoomed + panned to keep the skyline peeking in -->
+    <image href="__BG__" x="-565" y="-366" width="2112" height="1399"/>
+    <!-- edge halo (ring) so the disc separates from the scene; centre stays clear -->
+    <circle cx="512" cy="512" r="380" fill="url(#haloGrad)" filter="url(#blurBig)"/>
+
+    <!-- silver CD, ~67% of the tile -->
+    <g filter="url(#discShadow)">
+      <!-- silver mirror, as an annulus (transparent centre) -->
+      <g mask="url(#discMask)">
+        <circle cx="512" cy="512" r="343" fill="url(#disc)"/>
+        <circle cx="512" cy="512" r="343" fill="url(#irid1)" opacity="0.08"/>
+        <g fill="none" stroke="#ffffff" stroke-opacity="0.09">
+          <circle cx="512" cy="512" r="167" stroke-width="3"/>
+          <circle cx="512" cy="512" r="209" stroke-width="3"/>
+          <circle cx="512" cy="512" r="249" stroke-width="3"/>
+          <circle cx="512" cy="512" r="288" stroke-width="3"/>
+          <circle cx="512" cy="512" r="325" stroke-width="3"/>
+        </g>
+        <g clip-path="url(#discClip)">
+          <ellipse cx="432" cy="376" rx="284" ry="209" fill="url(#discGloss)" opacity="0.8" transform="rotate(-28 432 376)"/>
+        </g>
+      </g>
+      <!-- translucent clear clamping ring ("washer") around the hole -->
+      <circle cx="512" cy="512" r="115" fill="url(#washerGrad)" mask="url(#washerMask)"/>
+      <!-- ring highlights: washer outer edge, mirror inner edge, washer inner edge -->
+      <circle cx="512" cy="512" r="115" fill="none" stroke="#ffffff" stroke-opacity="0.4" stroke-width="2"/>
+      <circle cx="512" cy="512" r="117" fill="none" stroke="#8b97a6" stroke-opacity="0.45" stroke-width="2"/>
+      <circle cx="512" cy="512" r="45" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2"/>
+      <!-- transparent centre hole, with a soft edge -->
+      <circle cx="512" cy="512" r="45" fill="none" stroke="#16242f" stroke-opacity="0.28" stroke-width="3"/>
+    </g>
+  </g>
+</svg>

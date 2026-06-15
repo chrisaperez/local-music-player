@@ -1,0 +1,41 @@
+{
+  "name": "local-music-player",
+  "productName": "Music Player",
+  "version": "1.0.0",
+  "description": "A local, Spotify-like music player for your own files",
+  "author": "Chris",
+  "license": "MIT",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "icon": "electron build/render-icon.js && bash build/make-icns.sh",
+    "icns": "bash build/make-icns.sh"
+  },
+  "dependencies": {
+    "music-metadata": "^10.7.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.chris.localmusicplayer",
+    "productName": "Music Player",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "renderer/**/*",
+      "assets/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "dir"
+      ]
+    }
+  }
+}

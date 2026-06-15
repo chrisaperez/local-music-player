@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Packaged output (built locally with `npm run build`)
+dist/
+
+# Generated icon working files (regenerate with `npm run icon`)
+build/icon.iconset/
+build/.render.html
+
+# macOS / logs
+.DS_Store
+*.log
