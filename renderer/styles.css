@@ -411,6 +411,16 @@ input[type="range"].filled { background: linear-gradient(to right, var(--accent)
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
 #modal-desc-count { font-weight: 500; color: var(--text-faint); text-transform: none; letter-spacing: 0; }
 
+/* ----- Drag-and-drop import overlay ----- */
+body.dragging::after {
+  content: "Drop songs or an album folder to add them";
+  position: fixed; inset: 14px; z-index: 300;
+  border: 3px dashed var(--accent); border-radius: 18px;
+  background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(2px);
+  color: #fff; font-size: 22px; font-weight: 800; text-align: center; padding: 0 30px;
+  display: flex; align-items: center; justify-content: center; pointer-events: none;
+}
+
 /* ----- Toast ----- */
 .toast {
   position: fixed; bottom: calc(var(--player-h) + 18px); left: 50%; transform: translateX(-50%);

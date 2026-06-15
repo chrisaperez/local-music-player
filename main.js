@@ -10,7 +10,30 @@ const store = require('./src/main/store');
 protocols.registerPrivileged();
 
 let mainWindow = null;
+let isQuitting = false;
 let nowPlaying = { title: null, artist: null, playing: false };
+
+// On first run, copy the bundled CC sample album into the user's ~/Music so the
+// app has something to play out of the box.
+function installSamplesIfNeeded() {
+  try {
+    if (store.getSettings().samplesInstalled) return;
+    const srcAlbum = path.join(__dirname, 'samples', 'Music Player Samples');
+    let files = [];
+    try { files = fs.readdirSync(srcAlbum); } catch { store.setSettings({ samplesInstalled: true }); return; }
+    const destAlbum = path.join(app.getPath('music'), 'Music Player Samples');
+    fs.mkdirSync(destAlbum, { recursive: true });
+    for (const name of files) {
+      if (!/\.(mp3|flac|m4a|jpg|jpeg|png)$/i.test(name)) continue;
+      const dest = path.join(destAlbum, name);
+      // readFileSync is asar-aware (copyFileSync is not), so this works packaged.
+      if (!fs.existsSync(dest)) fs.writeFileSync(dest, fs.readFileSync(path.join(srcAlbum, name)));
+    }
+    store.setSettings({ samplesInstalled: true });
+  } catch (e) {
+    console.error('[samples] install failed:', e.message);
+  }
+}
 
 function sendControl(action) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('dock:control', action);
@@ -65,6 +88,16 @@ function createWindow() {
   mainWindow.webContents.on('render-process-gone', (_e, details) => {
     console.error('[renderer] process gone:', details.reason);
   });
+
+  // Keep playing when the window is closed — hide it instead of destroying it so
+  // the renderer (and its audio) keeps running, Spotify-style. Quitting (Cmd+Q)
+  // sets isQuitting and lets it actually close, which stops playback.
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
+  });
 }
 
 // Notify renderer when the system theme flips (only matters in 'system' mode).
@@ -76,6 +109,7 @@ nativeTheme.on('updated', () => {
 
 app.whenReady().then(() => {
   protocols.handle();
+  installSamplesIfNeeded();
   createWindow();
   buildDockMenu();
 
@@ -88,9 +122,12 @@ app.whenReady().then(() => {
   } catch (e) { /* non-fatal */ }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+    else createWindow();
   });
 });
+
+app.on('before-quit', () => { isQuitting = true; });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -107,6 +144,8 @@ ipcMain.handle('library:rescan', async () => {
   const { libraryRoot } = store.getSettings();
   return library.scan(libraryRoot);
 });
+
+ipcMain.handle('library:import', async (_e, paths) => library.importPaths(paths));
 
 ipcMain.handle('settings:get', async () => store.getSettings());
 ipcMain.handle('settings:set', async (_e, patch) => store.setSettings(patch));

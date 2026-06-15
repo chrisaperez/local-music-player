@@ -35,6 +35,8 @@ const DEFAULT_SETTINGS = {
   autoplay: true, // keep playing similar songs when the queue ends
   onRepeat: { week: null, paths: [] }, // cached weekly smart-playlist
   discover: { week: null, paths: [] }, // cached weekly recommendation mix
+  importedPaths: [], // files/folders dragged into the app (kept across launches)
+  samplesInstalled: false, // bundled CC sample tracks copied into ~/Music once
 };
 
 function getSettings() {

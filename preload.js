@@ -1,12 +1,16 @@
 'use strict';
 // Safe bridge between the renderer and the main process. The renderer only ever
 // sees this small, explicit API surface (no direct Node / ipc access).
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   getLibrary: () => ipcRenderer.invoke('library:get'),
   rescan: () => ipcRenderer.invoke('library:rescan'),
   getLibraryRoot: () => ipcRenderer.invoke('library:root'),
+  importPaths: (paths) => ipcRenderer.invoke('library:import', paths),
+
+  // Resolve the absolute path of a File dropped from Finder (Electron 32+ API).
+  getPathForFile: (file) => { try { return webUtils.getPathForFile(file); } catch (e) { return null; } },
 
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),

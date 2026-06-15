@@ -1244,6 +1244,51 @@
     Player.refreshQueue(byPath);
   }
 
+  function mergeTracks(list) {
+    let added = 0;
+    for (const t of list) {
+      if (!byPath.has(t.path)) { tracks.push(t); byPath.set(t.path, t); added++; }
+    }
+    return added;
+  }
+
+  // Re-load files dragged in previously (kept in settings) so they survive restarts/rescans.
+  async function loadImported() {
+    const paths = (settings.importedPaths || []).filter(Boolean);
+    if (!paths.length) return;
+    try {
+      mergeTracks(await api.importPaths(paths));
+      Player.refreshQueue(byPath);
+    } catch (e) { /* ignore */ }
+  }
+
+  function setupDropZone() {
+    const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+    window.addEventListener('dragenter', (e) => { stop(e); document.body.classList.add('dragging'); });
+    window.addEventListener('dragover', (e) => { stop(e); document.body.classList.add('dragging'); });
+    window.addEventListener('dragleave', (e) => { stop(e); if (e.relatedTarget === null) document.body.classList.remove('dragging'); });
+    window.addEventListener('drop', async (e) => {
+      stop(e);
+      document.body.classList.remove('dragging');
+      const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+      const paths = files.map((f) => api.getPathForFile(f)).filter(Boolean);
+      if (!paths.length) return;
+      toast('Importing…');
+      let imported = [];
+      try { imported = await api.importPaths(paths); } catch (err) { /* ignore */ }
+      if (!imported.length) { toast('No playable audio found'); return; }
+      mergeTracks(imported);
+      const set = new Set(settings.importedPaths || []);
+      paths.forEach((p) => set.add(p));
+      settings.importedPaths = [...set];
+      api.setSettings({ importedPaths: settings.importedPaths });
+      Player.refreshQueue(byPath);
+      view = { type: 'album', key: albumKey(imported[0]) }; // show the dropped album
+      render();
+      toast('Added ' + imported.length + ' song' + (imported.length === 1 ? '' : 's'));
+    });
+  }
+
   function updateLibPath() {
     api.getLibraryRoot().then((root) => { $('#lib-path').textContent = root || ''; });
   }
@@ -1264,6 +1309,7 @@
     try {
       const result = await api.rescan();
       await ingest(result);
+      await loadImported();
       await reloadHistory();
       await refreshOnRepeat();
       await refreshDiscover();
@@ -1295,6 +1341,7 @@
     setupKeyboard();
     setupAccent();
     setupQueue();
+    setupDropZone();
 
     // Dock right-click menu + media-key controls drive the player.
     api.onDockControl((action) => {
@@ -1319,6 +1366,7 @@
 
     const result = await api.getLibrary();
     await ingest(result);
+    await loadImported();
     await refreshOnRepeat();
     await refreshDiscover();
     render();

@@ -20,6 +20,9 @@ all computed and stored **on your machine**. Nothing is uploaded; there are no a
 - **Autoplay** — keeps playing similar songs when the queue runs out.
 - **Recaps** — Wrapped-style Weekly / Monthly / Yearly summaries (top tracks, artists, albums, minutes), computed locally.
 - **Now Playing** — play/pause, prev/next, seek, shuffle, repeat; macOS **Dock right-click** controls and **media keys** / Control Center.
+- **Background playback** — closing the window keeps the music playing; **⌘Q** (or pausing) stops it.
+- **Drag & drop** — drop songs or whole album folders onto the window to add them (remembered across launches).
+- **Sample music included** — a few Creative Commons tracks are copied into your library on first launch, so there's something to play right away.
 - **Themes** — dark / light / match-system, plus **11 accent colors** (5 warm, 5 cool, + grey).
 - Plays **FLAC** and **MP3** natively (also m4a/aac/ogg/opus/wav).
 
@@ -76,6 +79,9 @@ settings, play history, and cover-art cache live in `~/Library/Application Suppo
 The app icon includes a third-party Frutiger-Aero–style background image (`build/bg.png`). The
 source code is MIT-licensed (below); that image is not, and is bundled as-is — swap it for your own
 if you redistribute.
+
+The bundled sample tracks (`samples/`) are by **Kevin MacLeod** (incompetech.com), licensed
+**CC BY 4.0** — see [`samples/CREDITS.md`](samples/CREDITS.md).
 
 ## License
 
