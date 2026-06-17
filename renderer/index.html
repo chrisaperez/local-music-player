@@ -14,34 +14,31 @@
   <div id="app">
     <aside id="sidebar">
       <div class="brand">
-        <span class="brand-dot"></span> Music
+        <svg class="brand-cd" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="cd-body" cx="12" cy="12" r="10.5"/>
+          <ellipse cx="9" cy="8.4" rx="4.2" ry="2.4" fill="#ffffff" fill-opacity="0.3" transform="rotate(-28 9 8.4)"/>
+          <circle cx="12" cy="12" r="8.6" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="0.8"/>
+          <circle cx="12" cy="12" r="5.2" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="0.8"/>
+          <circle class="cd-hole" cx="12" cy="12" r="3"/>
+        </svg>
+        Music
       </div>
 
       <nav class="nav">
-        <button class="nav-item active" data-view="songs">
-          <span class="ico">♫</span> Songs
-        </button>
-        <button class="nav-item" data-view="albums">
-          <span class="ico">▦</span> Albums
-        </button>
-        <button class="nav-item" data-view="artists">
-          <span class="ico">☻</span> Artists
-        </button>
-        <button class="nav-item" data-view="recent">
-          <span class="ico">✦</span> Recently Added
-        </button>
-        <button class="nav-item" data-view="recaps">
-          <span class="ico">◔</span> Recaps
-        </button>
+        <button class="nav-item active" data-view="songs">Songs</button>
+        <button class="nav-item" data-view="albums">Albums</button>
+        <button class="nav-item" data-view="artists">Artists</button>
+        <button class="nav-item" data-view="recent">Recently Added</button>
+        <button class="nav-item" data-view="recaps">Recaps</button>
       </nav>
 
       <div class="pl-header">Made For You</div>
       <button class="nav-item onrepeat" id="onrepeat-item" data-view="onrepeat">
-        <span class="ico onrepeat-ico">⟲</span> On Repeat
+        On Repeat
         <span class="pl-count" id="onrepeat-count"></span>
       </button>
       <button class="nav-item onrepeat" id="discover-item" data-view="discover">
-        <span class="ico onrepeat-ico">✦</span> Discover Mix
+        Discover Mix
         <span class="pl-count" id="discover-count"></span>
       </button>
 
