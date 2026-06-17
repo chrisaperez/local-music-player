@@ -79,20 +79,57 @@
     return track && track.artPath ? api.mediaUrl(track.artPath) : PLACEHOLDER;
   }
 
-  // Reusable name + description dialog (Electron has no window.prompt).
-  function openModal({ title, name, description, saveLabel, onSave }) {
+  function renderModalPhoto(coverPath) {
+    const btn = $('#modal-photo');
+    if (coverPath) {
+      btn.classList.remove('empty');
+      btn.innerHTML = '<img alt=""><span class="mp-edit">Edit</span>';
+      btn.querySelector('img').src = api.mediaUrl(coverPath);
+    } else {
+      btn.classList.add('empty');
+      btn.innerHTML = QUARTER_NOTE + '<span class="mp-edit">Edit</span>';
+    }
+  }
+
+  // Reusable name + description (+ optional cover photo) dialog.
+  function openModal({ title, name, description, saveLabel, onSave, photo }) {
     const overlay = $('#modal-overlay');
     const nameI = $('#modal-name');
     const descI = $('#modal-desc');
     const count = $('#modal-desc-count');
     const saveB = $('#modal-save');
     const cancelB = $('#modal-cancel');
+    const photoRow = $('#modal-photo-row');
+    const photoBtn = $('#modal-photo');
     $('#modal-title').textContent = title || 'New Playlist';
     saveB.textContent = saveLabel || 'Save';
     nameI.value = name || '';
     descI.value = description || '';
     const updateCount = () => { count.textContent = descI.value.length + '/500'; };
     updateCount();
+
+    if (photo) {
+      photoRow.classList.remove('hidden');
+      let cover = photo.cover || null;
+      let hasCustom = !!photo.hasCustom;
+      renderModalPhoto(cover);
+      photoBtn.onclick = (e) => {
+        e.stopPropagation();
+        const items = [{ text: 'Change photo…', action: async () => {
+          const p = await api.pickPlaylistImage(photo.id);
+          if (p) { cover = p; hasCustom = true; renderModalPhoto(cover); photo.onApply(p); }
+        } }];
+        if (hasCustom) items.push({ text: 'Remove photo', action: () => {
+          cover = photo.fallback || null; hasCustom = false; renderModalPhoto(cover); photo.onApply(null);
+        } });
+        const r = photoBtn.getBoundingClientRect();
+        showMenu(r.left, r.bottom + 4, items);
+      };
+    } else {
+      photoRow.classList.add('hidden');
+      photoBtn.onclick = null;
+    }
+
     overlay.classList.remove('hidden');
     setTimeout(() => { nameI.focus(); nameI.select(); }, 30);
 
@@ -100,7 +137,7 @@
       overlay.classList.add('hidden');
       descI.removeEventListener('input', updateCount);
       document.removeEventListener('keydown', onKey);
-      saveB.onclick = cancelB.onclick = overlay.onclick = null;
+      saveB.onclick = cancelB.onclick = overlay.onclick = photoBtn.onclick = null;
     }
     function submit() {
       const nm = nameI.value.trim();
@@ -298,7 +335,10 @@
       tr.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/track', t.path);
         e.dataTransfer.effectAllowed = 'copyMove';
+        // defer so the drag ghost is snapshotted before the blur is applied
+        setTimeout(() => document.body.classList.add('dragging-track'), 0);
       });
+      tr.addEventListener('dragend', () => document.body.classList.remove('dragging-track'));
       if (opts.onRowDrop) enableRowReorder(tr, i, opts.onRowDrop);
       markPlaying(tr, t);
       tbody.appendChild(tr);
@@ -441,8 +481,6 @@
     const actions = el('div', { class: 'detail-actions' });
     if (list.length) actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(list, 0) }));
     actions.appendChild(el('button', { class: 'btn', text: 'Edit details', onclick: () => renamePlaylist(pl) }));
-    actions.appendChild(el('button', { class: 'btn', text: pl.coverPath ? 'Change photo' : 'Add photo', onclick: async () => { const p = await api.pickPlaylistImage(pl.id); if (p) { pl.coverPath = p; persistPlaylists(); render(); } } }));
-    if (pl.coverPath) actions.appendChild(el('button', { class: 'btn', text: 'Remove photo', onclick: () => { delete pl.coverPath; persistPlaylists(); render(); } }));
     actions.appendChild(el('button', { class: 'btn', text: 'Delete', onclick: () => deletePlaylist(pl) }));
     c.appendChild(actions);
     if (!list.length) {
@@ -508,11 +546,24 @@
   }
 
   function renamePlaylist(pl) {
+    const list = pl.paths.map((p) => byPath.get(p)).filter(Boolean);
+    const fallback = (list.find((t) => t.artPath) || {}).artPath || null;
     openModal({
       title: 'Edit Playlist',
       name: pl.name,
       description: pl.description || '',
       saveLabel: 'Save',
+      photo: {
+        id: pl.id,
+        cover: pl.coverPath || fallback || null,
+        fallback,
+        hasCustom: !!pl.coverPath,
+        onApply: (p) => {
+          if (p) pl.coverPath = p; else delete pl.coverPath;
+          persistPlaylists();
+          if (view.type === 'playlist') render();
+        },
+      },
       onSave: ({ name, description }) => {
         pl.name = name;
         pl.description = description;
@@ -1275,12 +1326,16 @@
 
   function setupDropZone() {
     const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
-    window.addEventListener('dragenter', (e) => { stop(e); document.body.classList.add('dragging'); });
-    window.addEventListener('dragover', (e) => { stop(e); document.body.classList.add('dragging'); });
+    // Only show the full-screen import overlay for real files from Finder, not
+    // for songs dragged inside the app (those use the selective sidebar blur).
+    const isFileDrag = (e) => !!(e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files'));
+    window.addEventListener('dragenter', (e) => { stop(e); if (isFileDrag(e)) document.body.classList.add('dragging'); });
+    window.addEventListener('dragover', (e) => { stop(e); if (isFileDrag(e)) document.body.classList.add('dragging'); });
     window.addEventListener('dragleave', (e) => { stop(e); if (e.relatedTarget === null) document.body.classList.remove('dragging'); });
     window.addEventListener('drop', async (e) => {
       stop(e);
       document.body.classList.remove('dragging');
+      document.body.classList.remove('dragging-track');
       const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
       const paths = files.map((f) => api.getPathForFile(f)).filter(Boolean);
       if (!paths.length) return;

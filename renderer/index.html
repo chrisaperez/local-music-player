@@ -32,7 +32,7 @@
         <button class="nav-item" data-view="recaps">Recaps</button>
       </nav>
 
-      <div class="pl-header">Made For You</div>
+      <div class="pl-header madefor-header">Made For You</div>
       <button class="nav-item onrepeat" id="onrepeat-item" data-view="onrepeat">
         On Repeat
         <span class="pl-count" id="onrepeat-count"></span>
@@ -119,6 +119,10 @@
   <div id="modal-overlay" class="modal-overlay hidden">
     <div class="modal">
       <h2 id="modal-title">New Playlist</h2>
+      <div id="modal-photo-row" class="modal-photo-row hidden">
+        <button id="modal-photo" class="modal-photo" type="button" title="Change cover photo"></button>
+        <div class="mp-hint">Cover photo<small>Click the photo to change or remove it</small></div>
+      </div>
       <label>Name</label>
       <input id="modal-name" type="text" maxlength="120" placeholder="My playlist" autocomplete="off" />
       <label>Description <span id="modal-desc-count">0/500</span></label>
