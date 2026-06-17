@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
 
   getPlaylists: () => ipcRenderer.invoke('playlists:get'),
   savePlaylists: (playlists) => ipcRenderer.invoke('playlists:save', playlists),
+  pickPlaylistImage: (id) => ipcRenderer.invoke('playlist:pickImage', id),
 
   getHistory: () => ipcRenderer.invoke('history:get'),
   recordPlay: (play) => ipcRenderer.invoke('history:record', play),

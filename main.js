@@ -153,6 +153,16 @@ ipcMain.handle('settings:set', async (_e, patch) => store.setSettings(patch));
 ipcMain.handle('playlists:get', async () => store.getPlaylists());
 ipcMain.handle('playlists:save', async (_e, playlists) => store.setPlaylists(playlists));
 
+ipcMain.handle('playlist:pickImage', async (_e, playlistId) => {
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose a playlist photo',
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'] }],
+  });
+  if (res.canceled || !res.filePaths.length) return null;
+  return store.savePlaylistCover(playlistId, res.filePaths[0]);
+});
+
 ipcMain.handle('history:get', async () => store.getHistory());
 ipcMain.handle('history:record', async (_e, play) => store.recordPlay(play));
 

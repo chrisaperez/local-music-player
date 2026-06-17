@@ -303,11 +303,17 @@ input { font-family: inherit; }
 .detail-head .d-meta { color: var(--text-dim); font-size: 13.5px; }
 .detail-actions { display: flex; gap: 12px; align-items: center; margin: 18px 0 22px; }
 .play-big {
-  width: 52px; height: 52px; border-radius: 50%; border: none;
-  background: var(--accent); color: #fff; font-size: 19px;
+  width: 62px; height: 62px; border-radius: 50%; border: none;
+  background: var(--accent); color: #fff;
   box-shadow: 0 6px 16px rgba(0,0,0,.35);
+  display: grid; place-items: center;
 }
+.play-big svg { width: 19px; height: 19px; }
 .play-big:hover { background: var(--accent-hover); transform: scale(1.04); }
+
+/* Empty-playlist default cover: a quarter note on a solid accent background */
+.d-cover.solid-cover { display: grid; place-items: center; background: var(--accent); }
+.d-cover.solid-cover svg { width: 70%; height: 70%; filter: drop-shadow(0 2px 4px rgba(0,0,0,.28)); }
 
 /* ----- Search results ----- */
 .results-section { margin-bottom: 28px; }

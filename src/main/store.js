@@ -74,4 +74,24 @@ function recordPlay(play) {
   return true;
 }
 
-module.exports = { getSettings, setSettings, getPlaylists, setPlaylists, getHistory, recordPlay };
+// Copy a chosen image into a per-playlist cover cache and return its path.
+function savePlaylistCover(playlistId, srcPath) {
+  try {
+    const coversDir = path.join(dir(), 'playlist-covers');
+    fs.mkdirSync(coversDir, { recursive: true });
+    // drop any previous cover for this playlist
+    for (const f of fs.readdirSync(coversDir)) {
+      if (f.startsWith(playlistId + '-')) {
+        try { fs.unlinkSync(path.join(coversDir, f)); } catch { /* ignore */ }
+      }
+    }
+    const ext = (path.extname(srcPath) || '.jpg').toLowerCase();
+    const dest = path.join(coversDir, playlistId + '-' + Date.now() + ext);
+    fs.copyFileSync(srcPath, dest);
+    return dest;
+  } catch {
+    return null;
+  }
+}
+
+module.exports = { getSettings, setSettings, getPlaylists, setPlaylists, getHistory, recordPlay, savePlaylistCover };

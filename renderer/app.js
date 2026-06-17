@@ -131,6 +131,9 @@
     smallPlay: '<svg viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>',
   };
 
+  // Quarter note — default cover for an empty playlist.
+  const QUARTER_NOTE = '<svg viewBox="0 0 100 100" fill="#ffffff"><rect x="54" y="12" width="7" height="64" rx="2.5"/><ellipse cx="42" cy="76" rx="19" ry="13.5" transform="rotate(-20 42 76)"/></svg>';
+
   // ---- Grouping ----
   function albumKey(t) { return (t.albumArtist || 'Unknown Artist') + SEP + (t.album || 'Unknown Album'); }
 
@@ -371,7 +374,11 @@
 
   function detailHeader(opts) {
     const head = el('div', { class: 'detail-head' });
-    head.appendChild(el('img', { class: 'd-cover' + (opts.round ? ' round' : ''), src: opts.art ? api.mediaUrl(opts.art) : PLACEHOLDER, onerror: imgFallback }));
+    if (opts.solidCover) {
+      head.appendChild(el('div', { class: 'd-cover solid-cover' + (opts.round ? ' round' : ''), html: QUARTER_NOTE }));
+    } else {
+      head.appendChild(el('img', { class: 'd-cover' + (opts.round ? ' round' : ''), src: opts.art ? api.mediaUrl(opts.art) : PLACEHOLDER, onerror: imgFallback }));
+    }
     const info = el('div');
     info.appendChild(el('div', { class: 'd-kind', text: opts.kind }));
     info.appendChild(el('div', { class: 'd-title', text: opts.title }));
@@ -428,10 +435,14 @@
     if (!pl) { view = { type: 'songs' }; return render(); }
     const list = pl.paths.map((p) => byPath.get(p)).filter(Boolean);
     const total = list.reduce((s, t) => s + (t.duration || 0), 0);
-    c.appendChild(detailHeader({ kind: 'Playlist', title: pl.name, desc: pl.description, art: list[0] ? list[0].artPath : null, meta: list.length + ' songs, ' + fmtTotal(total) }));
+    const cover = pl.coverPath || (list.find((t) => t.artPath) || {}).artPath || null;
+    const empty = list.length === 0 && !pl.coverPath;
+    c.appendChild(detailHeader({ kind: 'Playlist', title: pl.name, desc: pl.description, art: cover, solidCover: empty, meta: list.length + ' songs, ' + fmtTotal(total) }));
     const actions = el('div', { class: 'detail-actions' });
     if (list.length) actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(list, 0) }));
     actions.appendChild(el('button', { class: 'btn', text: 'Edit details', onclick: () => renamePlaylist(pl) }));
+    actions.appendChild(el('button', { class: 'btn', text: pl.coverPath ? 'Change photo' : 'Add photo', onclick: async () => { const p = await api.pickPlaylistImage(pl.id); if (p) { pl.coverPath = p; persistPlaylists(); render(); } } }));
+    if (pl.coverPath) actions.appendChild(el('button', { class: 'btn', text: 'Remove photo', onclick: () => { delete pl.coverPath; persistPlaylists(); render(); } }));
     actions.appendChild(el('button', { class: 'btn', text: 'Delete', onclick: () => deletePlaylist(pl) }));
     c.appendChild(actions);
     if (!list.length) {
