@@ -471,6 +471,9 @@ body.dragging-track .sidebar-footer {
   opacity: 0.4;
   transition: filter .12s ease, opacity .12s ease;
 }
+/* dim (not blur) the library area + player so reordering songs still works */
+body.dragging-track #main,
+body.dragging-track #player-bar { opacity: 0.4; transition: opacity .12s ease; }
 body.dragging-track #playlist-list { box-shadow: 0 0 0 2px var(--accent); border-radius: 8px; }
 
 /* ----- Toast ----- */
