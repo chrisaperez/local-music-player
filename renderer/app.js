@@ -16,20 +16,20 @@
   let onRepeatPaths = [];    // cached weekly smart-playlist
   let discoverPaths = [];    // cached weekly recommendation mix
   const ACCENTS = [
-    // warm — gradient: rose → red → orange → amber → gold
-    { id: 'rose', accent: '#fb7185', hover: '#fda4af', group: 'warm' },
-    { id: 'red', accent: '#ef4444', hover: '#f87171', group: 'warm' },
-    { id: 'orange', accent: '#f97316', hover: '#fb923c', group: 'warm' },
-    { id: 'amber', accent: '#f59e0b', hover: '#fbbf24', group: 'warm' },
-    { id: 'gold', accent: '#eab308', hover: '#facc15', group: 'warm' },
-    // cool — gradient: green → teal → cyan → blue → purple
-    { id: 'green', accent: '#22c55e', hover: '#4ade80', group: 'cool' },
-    { id: 'teal', accent: '#14b8a6', hover: '#2dd4bf', group: 'cool' },
-    { id: 'cyan', accent: '#06b6d4', hover: '#22d3ee', group: 'cool' },
-    { id: 'blue', accent: '#3b82f6', hover: '#60a5fa', group: 'cool' },
-    { id: 'purple', accent: '#8b5cf6', hover: '#a78bfa', group: 'cool' },
-    // neutral
-    { id: 'grey', accent: '#6b7280', hover: '#9ca3af', group: 'neutral' },
+    // warm — gradient: rose → red → orange → amber → gold (bright)
+    { id: 'rose', accent: '#ff5d8f', hover: '#ff85ac', group: 'warm' },
+    { id: 'red', accent: '#ff5252', hover: '#ff7b7b', group: 'warm' },
+    { id: 'orange', accent: '#ff8a1f', hover: '#ffa64d', group: 'warm' },
+    { id: 'amber', accent: '#ffb524', hover: '#ffca5c', group: 'warm' },
+    { id: 'gold', accent: '#ffd60a', hover: '#ffe45c', group: 'warm' },
+    // cool — gradient: green → teal → cyan → blue → purple (bright)
+    { id: 'green', accent: '#2be86a', hover: '#58f08e', group: 'cool' },
+    { id: 'teal', accent: '#1fdcc6', hover: '#52e8d6', group: 'cool' },
+    { id: 'cyan', accent: '#1ad4f0', hover: '#54e0f5', group: 'cool' },
+    { id: 'blue', accent: '#3d9bff', hover: '#6fb6ff', group: 'cool' },
+    { id: 'purple', accent: '#a36bff', hover: '#bd92ff', group: 'cool' },
+    // neutral (brighter)
+    { id: 'grey', accent: '#8b94a6', hover: '#a6aebd', group: 'neutral' },
   ];
   const PLACEHOLDER = '../assets/placeholder-cover.svg';
   const SEP = '\u0000';

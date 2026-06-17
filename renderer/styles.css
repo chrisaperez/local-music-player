@@ -1,12 +1,20 @@
+/* ----- Fonts ----- */
+@font-face {
+  font-family: "Roboto Slab";
+  src: url("fonts/RobotoSlab.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ----- Theme tokens ----- */
 :root {
-  --accent: #22c55e;
-  --accent-hover: #4ade80;
+  --accent: #2be86a;
+  --accent-hover: #58f08e;
   --radius: 8px;
   --sidebar-w: 248px;
   --player-h: 88px;
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial,
-    "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Apple SD Gothic Neo", sans-serif;
+  --font: "Roboto Slab", Georgia, "Times New Roman", serif;
 }
 
 [data-theme="dark"] {

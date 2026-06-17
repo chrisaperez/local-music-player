@@ -1,7 +1,7 @@
 {
   "name": "local-music-player",
   "productName": "Music Player",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A local, Spotify-like music player for your own files",
   "author": "Chris",
   "license": "MIT",
