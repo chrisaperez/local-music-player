@@ -11,6 +11,8 @@
   let playlists = [];
   let settings = { theme: 'system', volume: 1, shuffle: false, repeat: 'off' };
   let view = { type: 'songs' };
+  let navStack = [];         // back/forward history of view objects
+  let navIndex = -1;
   let songSort = { key: 'title', dir: 1 };
   let history = [];          // [{ p, t, ms }] local play log
   let onRepeatPaths = [];    // cached weekly smart-playlist
@@ -171,6 +173,40 @@
   // Quarter note — default cover for an empty playlist.
   const QUARTER_NOTE = '<svg viewBox="0 0 100 100" fill="#ffffff"><rect x="54" y="12" width="7" height="64" rx="2.5"/><ellipse cx="42" cy="76" rx="19" ry="13.5" transform="rotate(-20 42 76)"/></svg>';
 
+  // ---- Navigation (back/forward history) ----
+  function navigate(v, replace) {
+    if (replace && navIndex >= 0) {
+      navStack[navIndex] = v;
+    } else {
+      navStack = navStack.slice(0, navIndex + 1);
+      navStack.push(v);
+      navIndex = navStack.length - 1;
+    }
+    view = v;
+    render();
+    updateNavButtons();
+  }
+  function goBack() {
+    if (navIndex > 0) { navIndex--; view = navStack[navIndex]; render(); updateNavButtons(); }
+  }
+  function goForward() {
+    if (navIndex < navStack.length - 1) { navIndex++; view = navStack[navIndex]; render(); updateNavButtons(); }
+  }
+  function updateNavButtons() {
+    const b = $('#nav-back'), f = $('#nav-fwd');
+    if (b) b.disabled = navIndex <= 0;
+    if (f) f.disabled = navIndex >= navStack.length - 1;
+  }
+
+  // Inline clickable text (artist / album names that route somewhere).
+  function linkText(text, onClick) {
+    const s = el('span', { class: 'link', text });
+    s.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+    return s;
+  }
+  function gotoArtist(t) { navigate({ type: 'artist', name: t.albumArtist || 'Unknown Artist' }); }
+  function gotoAlbum(t) { navigate({ type: 'album', key: albumKey(t) }); }
+
   // ---- Grouping ----
   function albumKey(t) { return (t.albumArtist || 'Unknown Artist') + SEP + (t.album || 'Unknown Album'); }
 
@@ -312,15 +348,19 @@
           wrap.appendChild(el('img', { src: artUrl(t), loading: 'lazy', onerror: imgFallback }));
           const txt = el('div', { class: 'ca-text' });
           txt.appendChild(el('div', { class: 'ca-title', text: t.title }));
-          txt.appendChild(el('div', { class: 'ca-artist', text: t.artist }));
+          const artistLine = el('div', { class: 'ca-artist' });
+          artistLine.appendChild(linkText(t.artist, () => gotoArtist(t)));
+          txt.appendChild(artistLine);
           wrap.appendChild(txt);
           td.appendChild(wrap);
         } else if (col === 'title') {
           td = el('td', { class: 't-title', text: t.title });
         } else if (col === 'artist') {
-          td = el('td', { text: t.artist });
+          td = el('td');
+          td.appendChild(linkText(t.artist, () => gotoArtist(t)));
         } else if (col === 'album') {
-          td = el('td', { text: t.album });
+          td = el('td');
+          td.appendChild(linkText(t.album, () => gotoAlbum(t)));
         } else if (col === 'genre') {
           td = el('td', { class: 'col-genre', text: t.genre });
         } else if (col === 'year') {
@@ -386,7 +426,7 @@
       const fab = el('button', { class: 'play-fab', html: ICONS.play, title: 'Play' });
       fab.addEventListener('click', (e) => { e.stopPropagation(); playList(a.tracks, 0); });
       card.appendChild(fab);
-      card.addEventListener('click', () => { view = { type: 'album', key: a.key }; render(); });
+      card.addEventListener('click', () => { navigate({ type: 'album', key: a.key }); });
       grid.appendChild(card);
     }
     c.appendChild(grid);
@@ -406,7 +446,7 @@
       card.appendChild(el('img', { class: 'cover', src: a.art ? api.mediaUrl(a.art) : PLACEHOLDER, loading: 'lazy', onerror: imgFallback }));
       card.appendChild(el('div', { class: 'c-title', text: a.name }));
       card.appendChild(el('div', { class: 'c-sub', text: a.albums.size + ' album' + (a.albums.size === 1 ? '' : 's') + ' · ' + a.tracks.length + ' songs' }));
-      card.addEventListener('click', () => { view = { type: 'artist', name: a.name }; render(); });
+      card.addEventListener('click', () => { navigate({ type: 'artist', name: a.name }); });
       grid.appendChild(card);
     }
     c.appendChild(grid);
@@ -423,7 +463,8 @@
     info.appendChild(el('div', { class: 'd-kind', text: opts.kind }));
     info.appendChild(el('div', { class: 'd-title', text: opts.title }));
     if (opts.desc) info.appendChild(el('div', { class: 'd-desc', text: opts.desc }));
-    info.appendChild(el('div', { class: 'd-meta', text: opts.meta }));
+    if (opts.metaEl) info.appendChild(opts.metaEl);
+    else info.appendChild(el('div', { class: 'd-meta', text: opts.meta }));
     head.appendChild(info);
     return head;
   }
@@ -432,7 +473,10 @@
     const a = getAlbums().find((x) => x.key === key);
     if (!a) { view = { type: 'albums' }; return render(); }
     const total = a.tracks.reduce((s, t) => s + (t.duration || 0), 0);
-    c.appendChild(detailHeader({ kind: 'Album', title: a.album, art: a.art, meta: a.artist + ' · ' + (a.year || '—') + ' · ' + a.tracks.length + ' songs, ' + fmtTotal(total) }));
+    const meta = el('div', { class: 'd-meta' });
+    meta.appendChild(linkText(a.artist, () => navigate({ type: 'artist', name: a.artist })));
+    meta.appendChild(document.createTextNode(' · ' + (a.year || '—') + ' · ' + a.tracks.length + ' songs, ' + fmtTotal(total)));
+    c.appendChild(detailHeader({ kind: 'Album', title: a.album, art: a.art, metaEl: meta }));
     const actions = el('div', { class: 'detail-actions' });
     actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(a.tracks, 0) }));
     actions.appendChild(el('button', { class: 'btn', text: 'Add all to playlist…', onclick: (e) => openAlbumMenu(e, a.tracks) }));
@@ -460,7 +504,7 @@
         const fab = el('button', { class: 'play-fab', html: ICONS.play });
         fab.addEventListener('click', (e) => { e.stopPropagation(); playList(al.tracks, 0); });
         card.appendChild(fab);
-        card.addEventListener('click', () => { view = { type: 'album', key: al.key }; render(); });
+        card.addEventListener('click', () => navigate({ type: 'album', key: al.key }));
         grid.appendChild(card);
       }
       c.appendChild(grid);
@@ -579,7 +623,7 @@
     playlists = playlists.filter((p) => p.id !== pl.id);
     persistPlaylists();
     renderPlaylistList();
-    if (view.type === 'playlist' && view.id === pl.id) { view = { type: 'songs' }; render(); }
+    if (view.type === 'playlist' && view.id === pl.id) navigate({ type: 'songs' }, true);
   }
 
   function persistPlaylists() { api.savePlaylists(playlists); }
@@ -592,7 +636,7 @@
       li.appendChild(el('span', { text: pl.name, style: 'overflow:hidden;text-overflow:ellipsis' }));
       li.appendChild(el('span', { class: 'pl-count', text: String(pl.paths.length) }));
       li.classList.toggle('active', view.type === 'playlist' && view.id === pl.id);
-      li.addEventListener('click', () => { view = { type: 'playlist', id: pl.id }; render(); renderPlaylistList(); });
+      li.addEventListener('click', () => navigate({ type: 'playlist', id: pl.id }));
       li.addEventListener('contextmenu', (e) => { e.preventDefault(); openPlaylistMenu(e, pl); });
       // drop songs onto playlist
       li.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('text/track')) { e.preventDefault(); li.classList.add('drop-target'); } });
@@ -634,7 +678,7 @@
         card.appendChild(el('img', { class: 'cover', src: a.art ? api.mediaUrl(a.art) : PLACEHOLDER, onerror: imgFallback }));
         card.appendChild(el('div', { class: 'c-title', text: a.name }));
         card.appendChild(el('div', { class: 'c-sub', text: a.tracks.length + ' songs' }));
-        card.addEventListener('click', () => { view = { type: 'artist', name: a.name }; render(); });
+        card.addEventListener('click', () => { navigate({ type: 'artist', name: a.name }); });
         grid.appendChild(card);
       }
       sec.appendChild(grid);
@@ -653,7 +697,7 @@
         const fab = el('button', { class: 'play-fab', html: ICONS.play });
         fab.addEventListener('click', (e) => { e.stopPropagation(); playList(a.tracks, 0); });
         card.appendChild(fab);
-        card.addEventListener('click', () => { view = { type: 'album', key: a.key }; render(); });
+        card.addEventListener('click', () => { navigate({ type: 'album', key: a.key }); });
         grid.appendChild(card);
       }
       sec.appendChild(grid);
@@ -965,7 +1009,7 @@
       top.appendChild(el('div', { class: 'rc-period', text: r.label }));
       card.appendChild(top);
       card.appendChild(el('div', { class: 'rc-stat', html: '<b>' + Math.round(agg.totalMs / 60000) + '</b> minutes · ' + agg.count + ' plays' }));
-      card.addEventListener('click', () => { view = { type: 'recap', period }; render(); });
+      card.addEventListener('click', () => navigate({ type: 'recap', period }));
       cards.appendChild(card);
     }
     c.appendChild(cards);
@@ -974,7 +1018,7 @@
   function renderRecapDetail(c, period) {
     const r = periodRange(period);
     const agg = aggregate(r.from, r.to);
-    c.appendChild(el('button', { class: 'recap-back', text: '← Recaps', onclick: () => { view = { type: 'recaps' }; render(); } }));
+    c.appendChild(el('button', { class: 'recap-back', text: '← Recaps', onclick: () => navigate({ type: 'recaps' }) }));
     const hero = el('div', { class: 'recap-hero ' + period });
     hero.appendChild(el('div', { class: 'rh-kind', text: r.kind }));
     hero.appendChild(el('div', { class: 'rh-title', text: r.label }));
@@ -993,12 +1037,12 @@
       const t = byPath.get(p);
       return { key: p, count, title: t ? t.title : p.split('/').pop(), sub: t ? t.artist : '', art: t ? t.artPath : null, track: t };
     });
-    cols.appendChild(rankList('Top tracks', trackEntries, { onClick: (en) => { if (en.track) { view = { type: 'album', key: albumKey(en.track) }; render(); } } }));
+    cols.appendChild(rankList('Top tracks', trackEntries, { onClick: (en) => { if (en.track) navigate({ type: 'album', key: albumKey(en.track) }); } }));
     const artistEntries = topEntries(agg.byArtist, 5).map(([name, count]) => {
       const a = artists.find((x) => x.name === name);
       return { key: name, count, title: name, sub: '', art: a ? a.art : null };
     });
-    cols.appendChild(rankList('Top artists', artistEntries, { round: true, onClick: (en) => { view = { type: 'artist', name: en.key }; render(); } }));
+    cols.appendChild(rankList('Top artists', artistEntries, { round: true, onClick: (en) => navigate({ type: 'artist', name: en.key }) }));
     c.appendChild(cols);
 
     const albumEntries = topEntries(agg.byAlbum, 5).map(([k, count]) => {
@@ -1006,7 +1050,7 @@
       return { key: k, count, title: a ? a.album : k, sub: a ? a.artist : '', art: a ? a.art : null };
     });
     const albWrap = el('div', { style: 'margin-top:24px' });
-    albWrap.appendChild(rankList('Top albums', albumEntries, { onClick: (en) => { view = { type: 'album', key: en.key }; render(); } }));
+    albWrap.appendChild(rankList('Top albums', albumEntries, { onClick: (en) => navigate({ type: 'album', key: en.key }) }));
     c.appendChild(albWrap);
     c.appendChild(el('div', { class: 'recap-note' }, [el('span', { text: '🔒' }), el('span', { text: 'Calculated on your device from your local play history.' })]));
   }
@@ -1128,8 +1172,8 @@
       { label: 'Add to playlist' },
       ...playlistTargets([t.path]),
       { sep: true },
-      { text: 'Go to album', action: () => { view = { type: 'album', key: albumKey(t) }; render(); } },
-      { text: 'Go to artist', action: () => { view = { type: 'artist', name: t.albumArtist || 'Unknown Artist' }; render(); } },
+      { text: 'Go to album', action: () => gotoAlbum(t) },
+      { text: 'Go to artist', action: () => gotoArtist(t) },
     ];
     if (context === 'playlist' && view.type === 'playlist') {
       items.push({ sep: true });
@@ -1250,21 +1294,23 @@
     document.querySelectorAll('.nav-item').forEach((b) => b.addEventListener('click', async () => {
       const v = b.dataset.view;
       if (v === 'recaps' || v === 'onrepeat') await reloadHistory();
-      view = { type: v };
       $('#search').value = '';
-      render();
+      navigate({ type: v });
     }));
-    $('#new-playlist').addEventListener('click', () => openModal({ title: 'New Playlist', saveLabel: 'Create', onSave: ({ name, description }) => { const pl = newPlaylist(name, null, description); view = { type: 'playlist', id: pl.id }; render(); renderPlaylistList(); } }));
+    $('#new-playlist').addEventListener('click', () => openModal({ title: 'New Playlist', saveLabel: 'Create', onSave: ({ name, description }) => { const pl = newPlaylist(name, null, description); navigate({ type: 'playlist', id: pl.id }); } }));
 
     let searchTimer;
     $('#search').addEventListener('input', (e) => {
       clearTimeout(searchTimer);
       const q = e.target.value;
       searchTimer = setTimeout(() => {
-        if (q.trim()) { view = { type: 'search', query: q }; render(); }
-        else if (view.type === 'search') { view = { type: 'songs' }; render(); }
+        if (q.trim()) navigate({ type: 'search', query: q }, view.type === 'search');
+        else if (view.type === 'search') navigate({ type: 'songs' }, true);
       }, 120);
     });
+
+    $('#nav-back').addEventListener('click', goBack);
+    $('#nav-fwd').addEventListener('click', goForward);
 
     $('#rescan').addEventListener('click', rescan);
 
@@ -1287,6 +1333,8 @@
   function setupKeyboard() {
     document.addEventListener('keydown', (e) => {
       const inField = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+      if (e.metaKey && e.key === '[') { e.preventDefault(); goBack(); return; }
+      if (e.metaKey && e.key === ']') { e.preventDefault(); goForward(); return; }
       if (e.key === '/' && !inField) { e.preventDefault(); $('#search').focus(); return; }
       if (inField) return;
       if (e.code === 'Space') { e.preventDefault(); Player.toggle(); }
@@ -1349,8 +1397,7 @@
       settings.importedPaths = [...set];
       api.setSettings({ importedPaths: settings.importedPaths });
       Player.refreshQueue(byPath);
-      view = { type: 'album', key: albumKey(imported[0]) }; // show the dropped album
-      render();
+      navigate({ type: 'album', key: albumKey(imported[0]) }); // show the dropped album
       toast('Added ' + imported.length + ' song' + (imported.length === 1 ? '' : 's'));
     });
   }
@@ -1435,7 +1482,7 @@
     await loadImported();
     await refreshOnRepeat();
     await refreshDiscover();
-    render();
+    navigate(view); // seed the back/forward history with the initial view
   }
 
   window.addEventListener('DOMContentLoaded', init);

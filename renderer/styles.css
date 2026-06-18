@@ -174,6 +174,18 @@ input { font-family: inherit; }
   backdrop-filter: saturate(160%) blur(14px);
   -webkit-app-region: drag;
 }
+.topbar-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; -webkit-app-region: no-drag; }
+.nav-history { display: flex; gap: 6px; flex: none; }
+.histbtn {
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border);
+  background: var(--panel); color: var(--text-dim); display: grid; place-items: center;
+  transition: color .12s, background .12s;
+}
+.histbtn:hover:not(:disabled) { color: var(--text); background: var(--panel-hover); }
+.histbtn:disabled { opacity: 0.35; cursor: default; }
+/* clickable artist / album names */
+.link { cursor: pointer; }
+.link:hover { text-decoration: underline; color: var(--text); }
 .search { position: relative; flex: 1; max-width: 420px; -webkit-app-region: no-drag; }
 .search-ico {
   position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
