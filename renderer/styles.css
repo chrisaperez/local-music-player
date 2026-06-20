@@ -14,6 +14,7 @@
   --radius: 8px;
   --sidebar-w: 248px;
   --player-h: 88px;
+  --queue-w: 348px;
   --font: "Roboto Slab", Georgia, "Times New Roman", serif;
 }
 
@@ -79,7 +80,11 @@ input { font-family: inherit; }
   grid-template-columns: var(--sidebar-w) 1fr;
   height: 100vh;
   padding-bottom: var(--player-h);
+  transition: padding-right .2s ease;
 }
+/* when the queue is open, reserve space on the right so the middle resizes
+   instead of being covered by the queue panel */
+body.queue-open #app { padding-right: var(--queue-w); }
 
 /* ----- Sidebar ----- */
 #sidebar {
@@ -395,7 +400,7 @@ input[type="range"].filled { background: linear-gradient(to right, var(--accent)
 }
 
 .np-right { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
-.vol-ico { font-size: 14px; color: var(--text-dim); }
+.vol-ico { display: inline-flex; align-items: center; color: var(--text-dim); }
 .vol-bar { width: 110px; }
 
 /* ----- Context menu ----- */
@@ -534,12 +539,12 @@ body.dragging-track #playlist-list { box-shadow: 0 0 0 2px var(--accent); border
 
 /* ----- Queue panel ----- */
 .queue-panel {
-  position: fixed; right: 0; top: 28px; bottom: var(--player-h); width: 348px;
+  position: fixed; right: 0; top: 28px; bottom: var(--player-h); width: var(--queue-w);
   background: var(--bg-elev); border-left: 1px solid var(--border);
   z-index: 45; display: flex; flex-direction: column; box-shadow: var(--shadow);
   overflow: hidden; transition: transform .2s ease;
 }
-.queue-panel.hidden { display: flex !important; transform: translateX(360px); pointer-events: none; }
+.queue-panel.hidden { display: flex !important; transform: translateX(calc(var(--queue-w) + 12px)); pointer-events: none; }
 .q-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 18px 18px 10px; font-size: 17px; font-weight: 800;

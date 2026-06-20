@@ -1129,6 +1129,7 @@
       panel.classList.toggle('hidden');
       const open = !panel.classList.contains('hidden');
       btn.classList.toggle('on', open);
+      document.body.classList.toggle('queue-open', open);
       if (open) renderQueue();
     });
     Player.subscribe((type) => {
