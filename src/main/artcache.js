@@ -68,22 +68,19 @@ function saveEmbedded(albumKey, picture) {
   }
 }
 
-// Return cached art for this album. When the current fingerprint `fp` is known
-// (from the track's tags) it pins the lookup to the matching file; otherwise we
-// fall back to any cached art for the album (covers pre-fingerprint entries).
+// Return cached art for this album, pinned to the current image fingerprint
+// `fp` (from the track's tags). Without a fingerprint there is no embedded art
+// to serve, so we return null and let the caller fall back to a folder image —
+// this is what prevents a stale cover from being served after the art changes.
 function cachedPath(albumKey, fp) {
+  if (!fp) return null;
   const dir = cacheDir();
   const base = hash(albumKey);
-  if (fp) {
-    for (const ext of ART_EXTS) {
-      const f = path.join(dir, base + '-' + fp + ext);
-      if (fs.existsSync(f)) return f;
-    }
+  for (const ext of ART_EXTS) {
+    const f = path.join(dir, base + '-' + fp + ext);
+    if (fs.existsSync(f)) return f;
   }
-  let entries;
-  try { entries = fs.readdirSync(dir); } catch { return null; }
-  const match = entries.find((n) => n.startsWith(base) && ART_EXTS.includes(path.extname(n).toLowerCase()));
-  return match ? path.join(dir, match) : null;
+  return null;
 }
 
 // Look for a cover image sitting in the track's folder (e.g. "folder.jpg",
