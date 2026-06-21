@@ -430,21 +430,32 @@
     select.appendChild(el('option', { value: 'artist', text: 'Sort by Artist' }));
     select.appendChild(el('option', { value: 'title', text: 'Sort by Title' }));
     select.value = albumSort;
-    select.addEventListener('change', () => { albumSort = select.value; render(); });
+    
+    const grid = el('div', { class: 'card-grid' });
+    
+    select.addEventListener('change', () => { 
+      albumSort = select.value; 
+      const sorted = getAlbums();
+      for (const a of sorted) grid.appendChild(a.cardEl);
+    });
+    
     actions.appendChild(select);
     head.appendChild(actions);
     c.appendChild(head);
-    const grid = el('div', { class: 'card-grid' });
+    
     for (const a of albums) {
-      const card = el('div', { class: 'card' });
-      card.appendChild(el('img', { class: 'cover', src: a.art ? api.mediaUrl(a.art) : PLACEHOLDER, loading: 'lazy', onerror: imgFallback }));
-      card.appendChild(el('div', { class: 'c-title', text: a.album }));
-      card.appendChild(el('div', { class: 'c-sub', text: a.artist + (a.year ? ' · ' + a.year : '') }));
-      const fab = el('button', { class: 'play-fab', html: ICONS.play, title: 'Play' });
-      fab.addEventListener('click', (e) => { e.stopPropagation(); playList(a.tracks, 0); });
-      card.appendChild(fab);
-      card.addEventListener('click', () => { navigate({ type: 'album', key: a.key }); });
-      grid.appendChild(card);
+      if (!a.cardEl) {
+        const card = el('div', { class: 'card' });
+        card.appendChild(el('img', { class: 'cover', src: a.art ? api.mediaUrl(a.art) : PLACEHOLDER, loading: 'lazy', onerror: imgFallback }));
+        card.appendChild(el('div', { class: 'c-title', text: a.album }));
+        card.appendChild(el('div', { class: 'c-sub', text: a.artist + (a.year ? ' · ' + a.year : '') }));
+        const fab = el('button', { class: 'play-fab', html: ICONS.play, title: 'Play' });
+        fab.addEventListener('click', (e) => { e.stopPropagation(); playList(a.tracks, 0); });
+        card.appendChild(fab);
+        card.addEventListener('click', () => { navigate({ type: 'album', key: a.key }); });
+        a.cardEl = card;
+      }
+      grid.appendChild(a.cardEl);
     }
     c.appendChild(grid);
   }
