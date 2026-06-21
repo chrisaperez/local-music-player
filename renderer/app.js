@@ -7,6 +7,7 @@
 
   // ---- State ----
   let tracks = [];
+  let cachedAlbums = null;
   let byPath = new Map();
   let playlists = [];
   let settings = { theme: 'system', volume: 1, shuffle: false, repeat: 'off' };
@@ -212,17 +213,20 @@
   function albumKey(t) { return (t.albumArtist || 'Unknown Artist') + SEP + (t.album || 'Unknown Album'); }
 
   function getAlbums() {
-    const map = new Map();
-    for (const t of tracks) {
-      const k = albumKey(t);
-      let a = map.get(k);
-      if (!a) { a = { key: k, album: t.album, artist: t.albumArtist, year: t.year, art: null, tracks: [] }; map.set(k, a); }
-      a.tracks.push(t);
-      if (!a.art && t.artPath) a.art = t.artPath;
-      if (t.year && (!a.year || t.year < a.year)) a.year = t.year;
+    if (!cachedAlbums) {
+      const map = new Map();
+      for (const t of tracks) {
+        const k = albumKey(t);
+        let a = map.get(k);
+        if (!a) { a = { key: k, album: t.album, artist: t.albumArtist, year: t.year, art: null, tracks: [] }; map.set(k, a); }
+        a.tracks.push(t);
+        if (!a.art && t.artPath) a.art = t.artPath;
+        if (t.year && (!a.year || t.year < a.year)) a.year = t.year;
+      }
+      cachedAlbums = [...map.values()];
+      for (const a of cachedAlbums) a.tracks.sort(trackOrder);
     }
-    const arr = [...map.values()];
-    for (const a of arr) a.tracks.sort(trackOrder);
+    const arr = cachedAlbums;
     if (albumSort === 'title') {
       arr.sort((x, y) => (x.album || '').localeCompare(y.album || '') || (x.artist || '').localeCompare(y.artist || ''));
     } else {
@@ -423,8 +427,9 @@
     head.appendChild(left);
     const actions = el('div', { class: 'view-actions' });
     const select = el('select', { class: 'sort-select' });
-    select.appendChild(el('option', { value: 'artist', text: 'Sort by Artist', selected: albumSort === 'artist' }));
-    select.appendChild(el('option', { value: 'title', text: 'Sort by Title', selected: albumSort === 'title' }));
+    select.appendChild(el('option', { value: 'artist', text: 'Sort by Artist' }));
+    select.appendChild(el('option', { value: 'title', text: 'Sort by Title' }));
+    select.value = albumSort;
     select.addEventListener('change', () => { albumSort = select.value; render(); });
     actions.appendChild(select);
     head.appendChild(actions);
@@ -1365,6 +1370,7 @@
   // ============================================================
   async function ingest(result) {
     tracks = result.tracks || [];
+    cachedAlbums = null;
     byPath = new Map(tracks.map((t) => [t.path, t]));
     Player.refreshQueue(byPath);
   }
@@ -1374,6 +1380,7 @@
     for (const t of list) {
       if (!byPath.has(t.path)) { tracks.push(t); byPath.set(t.path, t); added++; }
     }
+    if (added > 0) cachedAlbums = null;
     return added;
   }
 
