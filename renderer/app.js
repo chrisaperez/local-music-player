@@ -14,6 +14,7 @@
   let navStack = [];         // back/forward history of view objects
   let navIndex = -1;
   let songSort = { key: 'title', dir: 1 };
+  let albumSort = 'artist';
   let history = [];          // [{ p, t, ms }] local play log
   let onRepeatPaths = [];    // cached weekly smart-playlist
   let discoverPaths = [];    // cached weekly recommendation mix
@@ -222,7 +223,11 @@
     }
     const arr = [...map.values()];
     for (const a of arr) a.tracks.sort(trackOrder);
-    arr.sort((x, y) => (x.artist || '').localeCompare(y.artist || '') || (x.year || 0) - (y.year || 0) || (x.album || '').localeCompare(y.album || ''));
+    if (albumSort === 'title') {
+      arr.sort((x, y) => (x.album || '').localeCompare(y.album || '') || (x.artist || '').localeCompare(y.artist || ''));
+    } else {
+      arr.sort((x, y) => (x.artist || '').localeCompare(y.artist || '') || (x.year || 0) - (y.year || 0) || (x.album || '').localeCompare(y.album || ''));
+    }
     return arr;
   }
 
@@ -242,7 +247,7 @@
   }
 
   function trackOrder(a, b) {
-    return (a.disc || 0) - (b.disc || 0) || (a.track || 9999) - (b.track || 9999) || (a.title || '').localeCompare(b.title || '');
+    return (a.album || '').localeCompare(b.album || '') || (a.disc || 0) - (b.disc || 0) || (a.track || 9999) - (b.track || 9999) || (a.title || '').localeCompare(b.title || '');
   }
 
   // ---- Player row context helpers ----
@@ -416,6 +421,13 @@
     left.appendChild(el('h1', { text: 'Albums' }));
     left.appendChild(el('div', { class: 'sub', text: albums.length + ' albums' }));
     head.appendChild(left);
+    const actions = el('div', { class: 'view-actions' });
+    const select = el('select', { class: 'sort-select' });
+    select.appendChild(el('option', { value: 'artist', text: 'Sort by Artist', selected: albumSort === 'artist' }));
+    select.appendChild(el('option', { value: 'title', text: 'Sort by Title', selected: albumSort === 'title' }));
+    select.addEventListener('change', () => { albumSort = select.value; render(); });
+    actions.appendChild(select);
+    head.appendChild(actions);
     c.appendChild(head);
     const grid = el('div', { class: 'card-grid' });
     for (const a of albums) {
@@ -1249,6 +1261,8 @@
       if (type === 'track') {
         const t = s.current;
         $('#np-art').src = t ? artUrl(t) : PLACEHOLDER;
+        $('#np-art').onclick = t ? () => gotoAlbum(t) : null;
+        $('#np-art').style.cursor = t ? 'pointer' : '';
         $('#np-title').textContent = t ? t.title : '—';
         $('#np-artist').textContent = t ? t.artist : '';
         document.title = t ? t.title + ' — ' + t.artist : 'Music Player';
