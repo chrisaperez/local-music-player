@@ -202,6 +202,18 @@ ipcMain.handle('playlist:pickImage', async (_e, playlistId) => {
   return store.savePlaylistCover(playlistId, res.filePaths[0]);
 });
 
+ipcMain.handle('spotify:pickCSV', async () => {
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose Spotify playlist CSV files (from Exportify)',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'CSV', extensions: ['csv'] }],
+  });
+  if (res.canceled || !res.filePaths.length) return [];
+  return res.filePaths.map((p) => {
+    try { return { name: path.basename(p), text: fs.readFileSync(p, 'utf8') }; } catch { return null; }
+  }).filter(Boolean);
+});
+
 ipcMain.handle('history:get', async () => store.getHistory());
 ipcMain.handle('history:record', async (_e, play) => store.recordPlay(play));
 

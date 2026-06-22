@@ -277,6 +277,7 @@
     else if (view.type === 'recaps') renderRecaps(c);
     else if (view.type === 'recap') renderRecapDetail(c, view.period);
     else if (view.type === 'sync') renderSync(c);
+    else if (view.type === 'spotimport') renderSpotImport(c);
     syncNavActive();
   }
 
@@ -1206,6 +1207,165 @@
   }
 
   // ============================================================
+  //  SPOTIFY IMPORT (match Exportify CSVs to the local library)
+  // ============================================================
+  let spotResults = null;
+
+  function parseCSV(text) {
+    const rows = [];
+    let row = [], field = '', inQuotes = false;
+    text = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+        else field += c;
+      } else if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else field += c;
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows.filter((r) => r.some((f) => f !== ''));
+  }
+
+  function mapCsvColumns(header) {
+    const norm = header.map((h) => String(h || '').toLowerCase().trim());
+    const find = (...preds) => { for (const p of preds) { const i = norm.findIndex(p); if (i >= 0) return i; } return -1; };
+    return {
+      title: find((h) => h === 'track name', (h) => h.includes('track name'), (h) => h === 'name', (h) => h.includes('title')),
+      artist: find((h) => h.includes('artist name'), (h) => h === 'artist', (h) => h.includes('artist')),
+      album: find((h) => h.includes('album name'), (h) => h === 'album'),
+      duration: find((h) => h.includes('duration')),
+    };
+  }
+
+  function normBase(s) {
+    return String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+      .replace(/&/g, ' and ').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  }
+  const VERSION_WORDS = 'feat|with|remaster|remastered|live|remix|edit|version|mono|stereo|acoustic|demo|bonus|deluxe|anniversary|instrumental|mix|radio|take|explicit';
+  function normTitle(s) {
+    let x = String(s || '').toLowerCase();
+    x = x.replace(new RegExp('\\([^)]*\\b(?:' + VERSION_WORDS + ')\\b[^)]*\\)', 'g'), '');
+    x = x.replace(new RegExp('\\[[^\\]]*\\b(?:' + VERSION_WORDS + ')\\b[^\\]]*\\]', 'g'), '');
+    x = x.replace(new RegExp('\\s[-–—]\\s.*\\b(?:' + VERSION_WORDS + ')\\b.*$', 'g'), '');
+    x = x.replace(/\bfeat\.?\b.*$/g, '');
+    return normBase(x);
+  }
+  function normArtist(s) { return normBase(String(s || '').split(/[,;]|&|\bfeat\.?\b|\bwith\b/i)[0]); }
+
+  function buildLocalIndex() {
+    const idx = new Map();
+    for (const t of tracks) {
+      const key = normTitle(t.title);
+      if (!key) continue;
+      if (!idx.has(key)) idx.set(key, []);
+      idx.get(key).push(t);
+    }
+    return idx;
+  }
+
+  function matchSpotifyRow(idx, row) {
+    const candidates = idx.get(normTitle(row.title));
+    if (!candidates || !candidates.length) return null;
+    const a = normArtist(row.artist);
+    let best = null, bestScore = -1;
+    for (const t of candidates) {
+      const ta = normArtist(t.artist), taa = normArtist(t.albumArtist);
+      let artistOk = !a || ta === a || taa === a || (a && (ta.includes(a) || a.includes(ta) || taa.includes(a) || a.includes(taa)));
+      if (!artistOk) continue;
+      let score = 2;
+      if (ta === a || taa === a) score += 2;
+      if (normTitle(t.album) === normTitle(row.album)) score += 1;
+      if (row.durationMs && t.duration) {
+        const diff = Math.abs(t.duration - row.durationMs / 1000);
+        if (diff <= 4) score += 1;
+        score -= diff * 0.02;
+      }
+      if (score > bestScore) { bestScore = score; best = t; }
+    }
+    return best;
+  }
+
+  function importSpotifyCSVs(files) {
+    const idx = buildLocalIndex();
+    const results = [];
+    for (const f of files) {
+      const rows = parseCSV(f.text);
+      if (rows.length < 2) { results.push({ name: f.name, error: 'Empty or unreadable CSV' }); continue; }
+      const cols = mapCsvColumns(rows[0]);
+      if (cols.title < 0) { results.push({ name: f.name, error: 'No “Track Name” column found' }); continue; }
+      const items = rows.slice(1).map((r) => ({
+        title: r[cols.title], artist: cols.artist >= 0 ? r[cols.artist] : '',
+        album: cols.album >= 0 ? r[cols.album] : '', durationMs: cols.duration >= 0 ? parseInt(r[cols.duration], 10) : null,
+      })).filter((r) => r.title && r.title.trim());
+
+      const seen = new Set(), matchedPaths = [], missing = [];
+      for (const row of items) {
+        const m = matchSpotifyRow(idx, row);
+        if (m && !seen.has(m.path)) { seen.add(m.path); matchedPaths.push(m.path); }
+        else if (!m) missing.push((row.title || '').trim() + (row.artist ? ' — ' + row.artist.split(',')[0].trim() : ''));
+      }
+      const name = f.name.replace(/\.csv$/i, '').trim() || 'Imported Playlist';
+      const pl = newPlaylist(name, matchedPaths, 'Imported from Spotify · ' + matchedPaths.length + ' of ' + items.length + ' songs matched');
+      results.push({ name: pl.name, id: pl.id, total: items.length, matched: matchedPaths.length, missing });
+    }
+    persistPlaylists();
+    renderPlaylistList();
+    return results;
+  }
+
+  function renderSpotImport(c) {
+    const head = el('div', { class: 'view-head' });
+    const left = el('div');
+    left.appendChild(el('h1', { text: 'Import from Spotify' }));
+    left.appendChild(el('div', { class: 'sub', text: 'Recreate your Spotify playlists from songs you already have.' }));
+    head.appendChild(left);
+    c.appendChild(head);
+
+    const card = el('div', { class: 'sync-card' });
+    card.appendChild(el('div', { class: 'sync-row-title', text: 'How it works' }));
+    const ol = el('div', { class: 'spot-steps' });
+    ol.innerHTML =
+      '1. Go to <b>exportify.net</b>, sign in with Spotify, and export each playlist (or “Export All”) as <b>CSV</b>.<br>' +
+      '2. Click below and choose the downloaded <b>.csv</b> files (or drag them onto the window).<br>' +
+      '3. Each becomes a playlist here, matched to your library by title + artist. Songs you don’t have are listed as missing.';
+    card.appendChild(ol);
+    card.appendChild(el('button', { class: 'btn primary', text: 'Choose CSV files…', style: 'margin-top:14px', onclick: async () => {
+      const files = await api.pickSpotifyCSV();
+      if (files && files.length) { spotResults = importSpotifyCSVs(files); render(); }
+    } }));
+    c.appendChild(card);
+
+    if (spotResults) {
+      const res = el('div', { class: 'spot-results' });
+      res.appendChild(el('h2', { text: 'Results', style: 'font-size:18px;font-weight:800;margin:22px 0 12px' }));
+      for (const r of spotResults) {
+        const block = el('div', { class: 'spot-result' });
+        if (r.error) {
+          block.appendChild(el('div', { class: 'spot-result-head', text: r.name + ' — ' + r.error }));
+        } else {
+          const headRow = el('div', { class: 'spot-result-head' });
+          headRow.appendChild(el('span', { class: 'link', text: r.name, onclick: () => navigate({ type: 'playlist', id: r.id }) }));
+          headRow.appendChild(el('span', { class: 'spot-stat', text: r.matched + ' of ' + r.total + ' matched' }));
+          block.appendChild(headRow);
+          if (r.missing && r.missing.length) {
+            const det = el('details', { class: 'spot-missing' });
+            det.appendChild(el('summary', { text: r.missing.length + ' missing (not in your library)' }));
+            const ul = el('ul');
+            for (const m of r.missing) ul.appendChild(el('li', { text: m }));
+            det.appendChild(ul);
+            block.appendChild(det);
+          }
+        }
+        res.appendChild(block);
+      }
+      c.appendChild(res);
+    }
+  }
+
+  // ============================================================
   //  CONTEXT MENUS
   // ============================================================
   function showMenu(x, y, items) {
@@ -1385,6 +1545,7 @@
 
     $('#rescan').addEventListener('click', rescan);
     $('#phone-sync').addEventListener('click', () => navigate({ type: 'sync' }));
+    $('#spot-import').addEventListener('click', () => navigate({ type: 'spotimport' }));
 
     document.querySelectorAll('#theme-seg button').forEach((b) => b.addEventListener('click', async () => {
       const choice = b.dataset.themeChoice;
@@ -1459,6 +1620,17 @@
       document.body.classList.remove('dragging');
       document.body.classList.remove('dragging-track');
       const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+
+      // Spotify CSVs dropped from Exportify -> playlist import.
+      const csvs = files.filter((f) => /\.csv$/i.test(f.name));
+      if (csvs.length) {
+        toast('Importing playlists…');
+        const parsed = [];
+        for (const f of csvs) { try { parsed.push({ name: f.name, text: await f.text() }); } catch (err) { /* ignore */ } }
+        if (parsed.length) { spotResults = importSpotifyCSVs(parsed); navigate({ type: 'spotimport' }); }
+        return;
+      }
+
       const paths = files.map((f) => api.getPathForFile(f)).filter(Boolean);
       if (!paths.length) return;
       toast('Importing…');

@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('api', {
   getSyncInfo: () => ipcRenderer.invoke('sync:info'),
   setSync: (enable) => ipcRenderer.invoke('sync:set', enable),
 
+  pickSpotifyCSV: () => ipcRenderer.invoke('spotify:pickCSV'),
+
   // Build a media:// URL for streaming a local file (audio or image).
   mediaUrl: (absPath) => 'media://stream/?p=' + encodeURIComponent(absPath),
 });
