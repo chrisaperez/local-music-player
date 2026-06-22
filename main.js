@@ -121,6 +121,7 @@ function createWindow() {
     console.error('[renderer] process gone:', details.reason);
   });
 
+
   // Keep playing when the window is closed — hide it instead of destroying it so
   // the renderer (and its audio) keeps running, Spotify-style. Quitting (Cmd+Q)
   // sets isQuitting and lets it actually close, which stops playback.
