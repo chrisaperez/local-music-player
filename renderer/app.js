@@ -255,7 +255,16 @@
   }
 
   // ---- Player row context helpers ----
-  function playList(list, index) { Player.playQueue(list, index); }
+  function playList(list, index, playlistId) { 
+    Player.playQueue(list, index); 
+    if (playlistId) {
+      const pl = playlists.find(p => p.id === playlistId);
+      if (pl) {
+        pl.lastPlayed = Date.now();
+        persistPlaylists();
+      }
+    }
+  }
 
   // ============================================================
   //  VIEWS
@@ -269,6 +278,7 @@
     else if (view.type === 'artists') renderArtists(c);
     else if (view.type === 'album') renderAlbumDetail(c, view.key);
     else if (view.type === 'artist') renderArtistDetail(c, view.name);
+    else if (view.type === 'playlists') renderAllPlaylists(c);
     else if (view.type === 'playlist') renderPlaylist(c, view.id);
     else if (view.type === 'search') renderSearch(c, view.query);
     else if (view.type === 'recent') renderRecent(c);
@@ -278,6 +288,7 @@
     else if (view.type === 'recap') renderRecapDetail(c, view.period);
     else if (view.type === 'sync') renderSync(c);
     else if (view.type === 'spotimport') renderSpotImport(c);
+    else if (view.type === 'advanced') renderAdvanced(c);
     syncNavActive();
   }
 
@@ -352,7 +363,7 @@
           td = el('td', { class: 'col-num' });
           const num = col === 'track' ? (t.track || (i + 1)) : (i + 1);
           td.innerHTML = '<span class="idx">' + num + '</span><span class="play-ico" title="Play">' + ICONS.smallPlay + '</span>';
-          td.querySelector('.play-ico').addEventListener('click', (e) => { e.stopPropagation(); playList(list, i); });
+          td.querySelector('.play-ico').addEventListener('click', (e) => { e.stopPropagation(); playList(list, i, opts.context === 'playlist' ? opts.contextId : null); });
         } else if (col === 'titleArt') {
           td = el('td', { class: 't-title' });
           const wrap = el('div', { class: 'cell-art' });
@@ -381,7 +392,7 @@
         }
         tr.appendChild(td);
       }
-      tr.addEventListener('dblclick', () => playList(list, i));
+      tr.addEventListener('dblclick', () => playList(list, i, opts.context === 'playlist' ? opts.contextId : null));
       tr.addEventListener('contextmenu', (e) => { e.preventDefault(); openTrackMenu(e, t, opts.context, i); });
       tr.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/track', t.path);
@@ -544,6 +555,62 @@
   // ============================================================
   //  PLAYLISTS
   // ============================================================
+  function renderAllPlaylists(c) {
+    const head = el('div', { class: 'view-head' });
+    const left = el('div');
+    left.appendChild(el('h1', { text: 'Playlists' }));
+    left.appendChild(el('div', { class: 'sub', text: playlists.length + ' playlists' }));
+    head.appendChild(left);
+    const actions = el('div', { class: 'view-actions' });
+    actions.appendChild(el('button', { class: 'btn primary', text: 'New Playlist', onclick: () => {
+      openModal({ title: 'New Playlist', saveLabel: 'Create', onSave: ({ name, description }) => { 
+        const pl = newPlaylist(name, null, description); 
+        navigate({ type: 'playlist', id: pl.id }); 
+      }});
+    }}));
+    head.appendChild(actions);
+    c.appendChild(head);
+    
+    if (!playlists.length) { c.appendChild(emptyState()); return; }
+    
+    const grid = el('div', { class: 'card-grid' });
+    for (const pl of playlists) {
+      const list = pl.paths.map((p) => byPath.get(p)).filter(Boolean);
+      const total = list.reduce((s, t) => s + (t.duration || 0), 0);
+      
+      const card = el('div', { class: 'card' });
+      
+      if (pl.coverPath) {
+        card.appendChild(el('img', { class: 'cover', src: api.mediaUrl(pl.coverPath), loading: 'lazy', onerror: imgFallback }));
+      } else {
+        const uniqueArts = [...new Set(list.filter(t => t.artPath).map(t => t.artPath))].slice(0, 4);
+        if (uniqueArts.length >= 4) {
+          const mosaic = el('div', { class: 'pl-mosaic' });
+          uniqueArts.forEach(art => mosaic.appendChild(el('img', { src: api.mediaUrl(art), loading: 'lazy', onerror: imgFallback })));
+          card.appendChild(mosaic);
+        } else if (uniqueArts.length > 0) {
+          card.appendChild(el('img', { class: 'cover', src: api.mediaUrl(uniqueArts[0]), loading: 'lazy', onerror: imgFallback }));
+        } else {
+          card.appendChild(el('img', { class: 'cover', src: PLACEHOLDER, loading: 'lazy', onerror: imgFallback }));
+        }
+      }
+      
+      card.appendChild(el('div', { class: 'c-title', text: pl.name }));
+      
+      const createdStr = pl.createdAt ? new Date(pl.createdAt).toLocaleDateString() : 'Unknown';
+      const playedStr = pl.lastPlayed ? new Date(pl.lastPlayed).toLocaleDateString() : 'Never';
+      
+      card.appendChild(el('div', { class: 'pl-card-sub', html: `${list.length} songs &middot; ${fmtTotal(total)}<br>Created: ${createdStr}<br>Last played: ${playedStr}` }));
+      
+      const fab = el('button', { class: 'play-fab', html: ICONS.play, title: 'Play' });
+      fab.addEventListener('click', (e) => { e.stopPropagation(); if (list.length) playList(list, 0, pl.id); });
+      card.appendChild(fab);
+      card.addEventListener('click', () => { navigate({ type: 'playlist', id: pl.id }); });
+      grid.appendChild(card);
+    }
+    c.appendChild(grid);
+  }
+
   function renderPlaylist(c, id) {
     const pl = playlists.find((p) => p.id === id);
     if (!pl) { view = { type: 'songs' }; return render(); }
@@ -553,14 +620,14 @@
     const empty = list.length === 0 && !pl.coverPath;
     c.appendChild(detailHeader({ kind: 'Playlist', title: pl.name, desc: pl.description, art: cover, solidCover: empty, meta: list.length + ' songs, ' + fmtTotal(total) }));
     const actions = el('div', { class: 'detail-actions' });
-    if (list.length) actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(list, 0) }));
+    if (list.length) actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(list, 0, id) }));
     actions.appendChild(el('button', { class: 'btn', text: 'Edit details', onclick: () => renamePlaylist(pl) }));
     actions.appendChild(el('button', { class: 'btn', text: 'Delete', onclick: () => deletePlaylist(pl) }));
     c.appendChild(actions);
     if (!list.length) {
       c.appendChild(el('div', { class: 'empty' }, [
         el('div', { class: 'big', text: 'This playlist is empty' }),
-        el('div', { text: 'Right-click any song and choose “Add to playlist”, or drag songs onto the playlist in the sidebar.' }),
+        el('div', { text: 'Right-click any song and choose “Add to playlist”.' }),
       ]));
       return;
     }
@@ -593,6 +660,7 @@
       id: 'pl_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       name: name || 'New Playlist',
       description: description || '',
+      createdAt: Date.now(),
       paths: seedPaths ? seedPaths.slice() : [],
     };
     playlists.push(pl);
@@ -659,25 +727,7 @@
   function persistPlaylists() { api.savePlaylists(playlists); }
 
   function renderPlaylistList() {
-    const ul = $('#playlist-list');
-    ul.innerHTML = '';
-    for (const pl of playlists) {
-      const li = el('li', { dataset: { id: pl.id } });
-      li.appendChild(el('span', { text: pl.name, style: 'overflow:hidden;text-overflow:ellipsis' }));
-      li.appendChild(el('span', { class: 'pl-count', text: String(pl.paths.length) }));
-      li.classList.toggle('active', view.type === 'playlist' && view.id === pl.id);
-      li.addEventListener('click', () => navigate({ type: 'playlist', id: pl.id }));
-      li.addEventListener('contextmenu', (e) => { e.preventDefault(); openPlaylistMenu(e, pl); });
-      // drop songs onto playlist
-      li.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('text/track')) { e.preventDefault(); li.classList.add('drop-target'); } });
-      li.addEventListener('dragleave', () => li.classList.remove('drop-target'));
-      li.addEventListener('drop', (e) => {
-        li.classList.remove('drop-target');
-        const p = e.dataTransfer.getData('text/track');
-        if (p) { e.preventDefault(); addToPlaylist(pl, p); }
-      });
-      ul.appendChild(li);
-    }
+    // No-op since sidebar playlist list was removed
   }
 
   // ============================================================
@@ -1316,6 +1366,57 @@
     return results;
   }
 
+  function renderAdvanced(c) {
+    const head = el('div', { class: 'view-head' });
+    const left = el('div');
+    left.appendChild(el('h1', { text: 'Advanced Settings' }));
+    left.appendChild(el('div', { class: 'sub', text: 'Manage your library, import playlists, and sync with devices.' }));
+    head.appendChild(left);
+    c.appendChild(head);
+
+    const container = el('div', { class: 'card-grid', style: 'grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: start;' });
+
+    // Option 1: Change Library Folder
+    const libCard = el('div', { class: 'card' });
+    libCard.style.padding = '20px';
+    libCard.appendChild(el('h3', { text: 'Change Library Folder', style: 'margin: 0 0 8px;' }));
+    libCard.appendChild(el('div', { text: 'Select a different folder on your computer to use as your music library.', style: 'margin-bottom: 16px; font-size: 13px; color: var(--text-muted);' }));
+    const curPath = el('div', { style: 'margin-bottom: 16px; font-size: 13px; font-family: monospace; overflow-wrap: break-word;' });
+    api.getLibraryRoot().then(root => curPath.textContent = 'Current: ' + (root || 'Not set'));
+    libCard.appendChild(curPath);
+    libCard.appendChild(el('button', { class: 'btn primary', text: 'Choose Folder', onclick: async () => {
+      const folder = await api.chooseFolder();
+      if (folder) { settings.libraryRoot = folder; await rescan(); renderAdvanced(c); }
+    }}));
+    container.appendChild(libCard);
+
+    // Option 2: Rescan Library
+    const rescanCard = el('div', { class: 'card' });
+    rescanCard.style.padding = '20px';
+    rescanCard.appendChild(el('h3', { text: 'Rescan Library', style: 'margin: 0 0 8px;' }));
+    rescanCard.appendChild(el('div', { text: 'Check your music folder for any newly added songs or changes.', style: 'margin-bottom: 16px; font-size: 13px; color: var(--text-muted);' }));
+    rescanCard.appendChild(el('button', { class: 'btn', text: 'Rescan Now', onclick: rescan }));
+    container.appendChild(rescanCard);
+
+    // Option 3: Phone Sync
+    const syncCard = el('div', { class: 'card' });
+    syncCard.style.padding = '20px';
+    syncCard.appendChild(el('h3', { text: 'Phone Sync', style: 'margin: 0 0 8px;' }));
+    syncCard.appendChild(el('div', { text: 'Sync your music library and playlists to a connected mobile device over Wi-Fi.', style: 'margin-bottom: 16px; font-size: 13px; color: var(--text-muted);' }));
+    syncCard.appendChild(el('button', { class: 'btn', text: 'Open Phone Sync', onclick: () => navigate({ type: 'sync' }) }));
+    container.appendChild(syncCard);
+
+    // Option 4: Import from Spotify
+    const spotCard = el('div', { class: 'card' });
+    spotCard.style.padding = '20px';
+    spotCard.appendChild(el('h3', { text: 'Import from Spotify', style: 'margin: 0 0 8px;' }));
+    spotCard.appendChild(el('div', { text: 'Recreate your Spotify playlists locally by importing CSVs from Exportify.', style: 'margin-bottom: 16px; font-size: 13px; color: var(--text-muted);' }));
+    spotCard.appendChild(el('button', { class: 'btn', text: 'Import Playlists', onclick: () => navigate({ type: 'spotimport' }) }));
+    container.appendChild(spotCard);
+
+    c.appendChild(container);
+  }
+
   function renderSpotImport(c) {
     const head = el('div', { class: 'view-head' });
     const left = el('div');
@@ -1516,9 +1617,8 @@
   function syncNavActive() {
     document.querySelectorAll('.nav-item').forEach((b) => {
       const v = b.dataset.view;
-      b.classList.toggle('active', v === view.type || (view.type === 'album' && v === 'albums') || (view.type === 'artist' && v === 'artists') || (view.type === 'recap' && v === 'recaps'));
+      b.classList.toggle('active', v === view.type || (view.type === 'album' && v === 'albums') || (view.type === 'artist' && v === 'artists') || (view.type === 'recap' && v === 'recaps') || (view.type === 'playlist' && v === 'playlists') || (view.type === 'sync' && v === 'advanced') || (view.type === 'spotimport' && v === 'advanced'));
     });
-    document.querySelectorAll('#playlist-list li').forEach((li) => li.classList.toggle('active', view.type === 'playlist' && li.dataset.id === view.id));
   }
 
   function setupNav() {
@@ -1528,7 +1628,7 @@
       $('#search').value = '';
       navigate({ type: v });
     }));
-    $('#new-playlist').addEventListener('click', () => openModal({ title: 'New Playlist', saveLabel: 'Create', onSave: ({ name, description }) => { const pl = newPlaylist(name, null, description); navigate({ type: 'playlist', id: pl.id }); } }));
+    // removed #new-playlist listener
 
     let searchTimer;
     $('#search').addEventListener('input', (e) => {
@@ -1542,10 +1642,6 @@
 
     $('#nav-back').addEventListener('click', goBack);
     $('#nav-fwd').addEventListener('click', goForward);
-
-    $('#rescan').addEventListener('click', rescan);
-    $('#phone-sync').addEventListener('click', () => navigate({ type: 'sync' }));
-    $('#spot-import').addEventListener('click', () => navigate({ type: 'spotimport' }));
 
     document.querySelectorAll('#theme-seg button').forEach((b) => b.addEventListener('click', async () => {
       const choice = b.dataset.themeChoice;
@@ -1649,7 +1745,8 @@
   }
 
   function updateLibPath() {
-    api.getLibraryRoot().then((root) => { $('#lib-path').textContent = root || ''; });
+    const el = $('#lib-path');
+    if (el) api.getLibraryRoot().then((root) => { el.textContent = root || ''; });
   }
 
   let toastTimer;
@@ -1664,7 +1761,7 @@
 
   async function rescan() {
     const btn = $('#rescan');
-    btn.classList.add('spinning');
+    if (btn) btn.classList.add('spinning');
     try {
       const result = await api.rescan();
       await ingest(result);
@@ -1676,7 +1773,7 @@
       render();
       toast('Library updated · ' + tracks.length + ' songs');
     } finally {
-      btn.classList.remove('spinning');
+      if (btn) btn.classList.remove('spinning');
     }
   }
 
@@ -1729,6 +1826,8 @@
     await refreshOnRepeat();
     await refreshDiscover();
     navigate(view); // seed the back/forward history with the initial view
+
+    rescan(); // Automatically rescan on boot
   }
 
   window.addEventListener('DOMContentLoaded', init);
