@@ -15,7 +15,7 @@
   let navStack = [];         // back/forward history of view objects
   let navIndex = -1;
   let songSort = { key: 'title', dir: 1 };
-  let albumSort = 'artist';
+  let albumSort = 'title';
   let history = [];          // [{ p, t, ms }] local play log
   let onRepeatPaths = [];    // cached weekly smart-playlist
   let discoverPaths = [];    // cached weekly recommendation mix
