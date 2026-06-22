@@ -276,6 +276,7 @@
     else if (view.type === 'discover') renderDiscover(c);
     else if (view.type === 'recaps') renderRecaps(c);
     else if (view.type === 'recap') renderRecapDetail(c, view.period);
+    else if (view.type === 'sync') renderSync(c);
     syncNavActive();
   }
 
@@ -745,6 +746,45 @@
       el('div', { class: 'big', text: msg || 'Your library is empty' }),
       el('div', { text: msg ? '' : 'Add music to your folder, then click “Rescan library”.' }),
     ]);
+  }
+
+  async function renderSync(c) {
+    const head = el('div', { class: 'view-head' });
+    const left = el('div');
+    left.appendChild(el('h1', { text: 'Phone Sync' }));
+    left.appendChild(el('div', { class: 'sub', text: 'Share this library with another device on your wifi.' }));
+    head.appendChild(left);
+    c.appendChild(head);
+
+    const info = await api.getSyncInfo();
+    if (view.type !== 'sync') return; // navigated away while awaiting
+
+    const card = el('div', { class: 'sync-card' });
+    const row = el('div', { class: 'sync-row' });
+    row.appendChild(el('div', {}, [
+      el('div', { class: 'sync-row-title', text: 'Enable phone sync' }),
+      el('div', { class: 'sync-row-sub', text: 'Runs a small local-network server so a phone can connect.' }),
+    ]));
+    const tg = el('button', { class: 'q-toggle' + (info.enabled ? ' on' : ''), html: '<span class="knob"></span>', title: 'Toggle' });
+    tg.addEventListener('click', async () => { await api.setSync(!info.enabled); if (view.type === 'sync') render(); });
+    row.appendChild(tg);
+    card.appendChild(row);
+
+    if (info.enabled && info.running) {
+      const details = el('div', { class: 'sync-details' });
+      const field = (label, value) => el('div', { class: 'sync-field' }, [
+        el('span', { class: 'sync-label', text: label }),
+        el('code', { class: 'sync-value', text: value }),
+      ]);
+      details.appendChild(field('Address', info.address + ':' + info.port));
+      details.appendChild(field('Code', info.token || '—'));
+      details.appendChild(el('div', { class: 'sync-note', text: info.tracks + ' tracks shared. Keep this app open and your Mac on the same wifi network.' }));
+      details.appendChild(el('div', { class: 'sync-note dim', text: '🔒 Local network only and protected by the code above. Traffic is unencrypted, so use it on a network you trust.' }));
+      card.appendChild(details);
+    } else if (info.enabled) {
+      card.appendChild(el('div', { class: 'sync-note', text: 'Starting…' }));
+    }
+    c.appendChild(card);
   }
 
   // ============================================================
@@ -1344,6 +1384,7 @@
     $('#nav-fwd').addEventListener('click', goForward);
 
     $('#rescan').addEventListener('click', rescan);
+    $('#phone-sync').addEventListener('click', () => navigate({ type: 'sync' }));
 
     document.querySelectorAll('#theme-seg button').forEach((b) => b.addEventListener('click', async () => {
       const choice = b.dataset.themeChoice;

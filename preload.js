@@ -31,6 +31,9 @@ contextBridge.exposeInMainWorld('api', {
 
   chooseFolder: () => ipcRenderer.invoke('dialog:chooseFolder'),
 
+  getSyncInfo: () => ipcRenderer.invoke('sync:info'),
+  setSync: (enable) => ipcRenderer.invoke('sync:set', enable),
+
   // Build a media:// URL for streaming a local file (audio or image).
   mediaUrl: (absPath) => 'media://stream/?p=' + encodeURIComponent(absPath),
 });

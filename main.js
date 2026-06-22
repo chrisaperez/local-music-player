@@ -5,6 +5,7 @@ const { app, BrowserWindow, ipcMain, nativeTheme, dialog, Menu, nativeImage } = 
 const protocols = require('./src/main/protocols');
 const library = require('./src/main/library');
 const store = require('./src/main/store');
+const syncserver = require('./src/main/syncserver');
 
 // Privileged scheme registration must happen before the app is ready.
 protocols.registerPrivileged();
@@ -37,6 +38,37 @@ function installSamplesIfNeeded() {
 
 function sendControl(action) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('dock:control', action);
+}
+
+// ---- Phone sync (LAN server) ----
+function ensureSyncToken() {
+  let { syncToken } = store.getSettings();
+  if (!syncToken) {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
+    syncToken = Array.from({ length: 6 }, () => A[Math.floor(Math.random() * A.length)]).join('');
+    store.setSettings({ syncToken });
+  }
+  return syncToken;
+}
+async function startSync() {
+  const token = ensureSyncToken();
+  try {
+    const { libraryRoot } = store.getSettings();
+    const result = await library.scan(libraryRoot);
+    syncserver.setTracks(result.tracks);
+  } catch (e) { console.error('[sync] scan failed:', e.message); }
+  const inf = syncserver.start({ token, port: 8787, version: app.getVersion() });
+  store.setSettings({ syncEnabled: true });
+  return Object.assign({ enabled: true, token }, inf);
+}
+function stopSync() {
+  const inf = syncserver.stop();
+  store.setSettings({ syncEnabled: false });
+  return Object.assign({ enabled: false, token: store.getSettings().syncToken || null }, inf);
+}
+function syncInfo() {
+  const s = store.getSettings();
+  return Object.assign({ enabled: s.syncEnabled, token: s.syncToken || null }, syncserver.info());
 }
 
 // macOS Dock right-click menu with transport controls (Spotify-style).
@@ -125,6 +157,8 @@ app.whenReady().then(() => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
     else createWindow();
   });
+
+  if (store.getSettings().syncEnabled) startSync();
 });
 
 app.on('before-quit', () => { isQuitting = true; });
@@ -142,8 +176,13 @@ ipcMain.handle('library:get', async () => {
 
 ipcMain.handle('library:rescan', async () => {
   const { libraryRoot } = store.getSettings();
-  return library.scan(libraryRoot);
+  const result = await library.scan(libraryRoot);
+  if (syncserver.info().running) syncserver.setTracks(result.tracks);
+  return result;
 });
+
+ipcMain.handle('sync:info', async () => syncInfo());
+ipcMain.handle('sync:set', async (_e, enable) => (enable ? startSync() : stopSync()));
 
 ipcMain.handle('library:import', async (_e, paths) => library.importPaths(paths));
 

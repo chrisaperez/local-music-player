@@ -37,6 +37,8 @@ const DEFAULT_SETTINGS = {
   discover: { week: null, paths: [] }, // cached weekly recommendation mix
   importedPaths: [], // files/folders dragged into the app (kept across launches)
   samplesInstalled: false, // bundled CC sample tracks copied into ~/Music once
+  syncEnabled: false, // LAN phone-sync server on/off
+  syncToken: null, // pairing code for phone sync
 };
 
 function getSettings() {
