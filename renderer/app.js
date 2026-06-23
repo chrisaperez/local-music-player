@@ -1369,7 +1369,7 @@
   function renderAdvanced(c) {
     const head = el('div', { class: 'view-head' });
     const left = el('div');
-    left.appendChild(el('h1', { text: 'Advanced Settings' }));
+    left.appendChild(el('h1', { text: 'Settings' }));
     left.appendChild(el('div', { class: 'sub', text: 'Manage your library, import playlists, and sync with devices.' }));
     head.appendChild(left);
     c.appendChild(head);
@@ -1644,6 +1644,7 @@
 
     $('#nav-back').addEventListener('click', goBack);
     $('#nav-fwd').addEventListener('click', goForward);
+    $('#rescan').addEventListener('click', rescan);
 
     document.querySelectorAll('#theme-seg button').forEach((b) => b.addEventListener('click', async () => {
       const choice = b.dataset.themeChoice;
