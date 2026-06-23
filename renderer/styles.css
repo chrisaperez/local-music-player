@@ -375,6 +375,8 @@ body.queue-open #app { padding-right: var(--queue-w); }
 .np-meta { min-width: 0; }
 .np-title { font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-artist { font-size: 12px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-artist.clickable { cursor: pointer; }
+.np-artist.clickable:hover { color: var(--text); text-decoration: underline; }
 
 .np-center { display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(540px, 42vw); }
 .transport { display: flex; align-items: center; gap: 18px; }

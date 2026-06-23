@@ -1582,6 +1582,8 @@
         $('#np-art').style.cursor = t ? 'pointer' : '';
         $('#np-title').textContent = t ? t.title : '—';
         $('#np-artist').textContent = t ? t.artist : '';
+        $('#np-artist').onclick = t ? () => gotoArtist(t) : null;
+        $('#np-artist').classList.toggle('clickable', !!t);
         document.title = t ? t.title + ' — ' + t.artist : 'Music Player';
         // refresh playing highlight in current view
         document.querySelectorAll('.track-row').forEach((tr) => tr.classList.toggle('playing', !!t && tr.dataset.path === t.path));
