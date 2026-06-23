@@ -1656,7 +1656,8 @@
 
     api.onThemeUpdated((info) => { if (settings.theme === 'system') applyTheme(info.dark); });
 
-    $('#lib-path').addEventListener('click', async () => {
+    const libPath = $('#lib-path');
+    if (libPath) libPath.addEventListener('click', async () => {
       const folder = await api.chooseFolder();
       if (folder) { settings.libraryRoot = folder; await rescan(); updateLibPath(); }
     });
