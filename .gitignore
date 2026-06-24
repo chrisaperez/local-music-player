@@ -11,3 +11,6 @@ build/.render.html
 # macOS / logs
 .DS_Store
 *.log
+
+# unbuilt features
+ios/
