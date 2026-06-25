@@ -1132,7 +1132,7 @@
       cards.appendChild(card);
     }
     c.appendChild(cards);
-    c.appendChild(el('div', { class: 'recap-note' }, [el('span', { text: '🔒' }), el('span', { text: 'Only the song and time are recorded, and only on this Mac. Nothing is uploaded.' })]));
+    c.appendChild(el('div', { class: 'recap-note' }, [el('span', { text: 'Only the song and time are recorded, and only on this Mac. Nothing is uploaded.' })]));
   }
   function renderRecapDetail(c, period) {
     const r = periodRange(period);
