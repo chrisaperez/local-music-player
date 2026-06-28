@@ -520,7 +520,8 @@
     c.appendChild(detailHeader({ kind: 'Album', title: a.album, art: a.art, metaEl: meta }));
     const actions = el('div', { class: 'detail-actions' });
     actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(a.tracks, 0) }));
-    actions.appendChild(el('button', { class: 'btn', text: 'Add all to playlist…', onclick: (e) => openAlbumMenu(e, a.tracks) }));
+    actions.appendChild(el('button', { class: 'btn', text: 'Add to queue', onclick: () => { Player.addToQueue(a.tracks); toast(a.tracks.length + ' added to queue'); } }));
+    actions.appendChild(el('button', { class: 'btn', text: 'More…', onclick: (e) => openAlbumMenu(e, a.tracks) }));
     c.appendChild(actions);
     c.appendChild(trackTable(a.tracks, { columns: ['track', 'titleArt', 'genre', 'duration'], context: 'album' }));
   }
@@ -530,7 +531,9 @@
     if (!a) { view = { type: 'artists' }; return render(); }
     c.appendChild(detailHeader({ kind: 'Artist', round: true, title: a.name, art: a.art, meta: a.albums.size + ' albums · ' + a.tracks.length + ' songs' }));
     const actions = el('div', { class: 'detail-actions' });
-    actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(a.tracks.slice().sort(trackOrder), 0) }));
+    const artistTracks = a.tracks.slice().sort(trackOrder);
+    actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(artistTracks, 0) }));
+    actions.appendChild(el('button', { class: 'btn', text: 'Add to queue', onclick: () => { Player.addToQueue(artistTracks); toast(artistTracks.length + ' added to queue'); } }));
     c.appendChild(actions);
     // albums by this artist
     const albums = getAlbums().filter((al) => al.artist === name);
@@ -621,6 +624,7 @@
     c.appendChild(detailHeader({ kind: 'Playlist', title: pl.name, desc: pl.description, art: cover, solidCover: empty, meta: list.length + ' songs, ' + fmtTotal(total) }));
     const actions = el('div', { class: 'detail-actions' });
     if (list.length) actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(list, 0, id) }));
+    if (list.length) actions.appendChild(el('button', { class: 'btn', text: 'Add to queue', onclick: () => { Player.addToQueue(list); toast(list.length + ' added to queue'); } }));
     actions.appendChild(el('button', { class: 'btn', text: 'Edit details', onclick: () => renamePlaylist(pl) }));
     actions.appendChild(el('button', { class: 'btn', text: 'Delete', onclick: () => deletePlaylist(pl) }));
     c.appendChild(actions);
@@ -1185,15 +1189,10 @@
     meta.appendChild(el('div', { class: 'q-title', text: t.title }));
     meta.appendChild(el('div', { class: 'q-artist', text: t.artist }));
     row.appendChild(meta);
+    if (opts.type) row.dataset.qtype = opts.type;
+    if (opts.index !== undefined) row.dataset.qidx = opts.index;
     if (opts.removable) row.appendChild(el('button', { class: 'q-remove', text: '✕', onclick: (e) => { e.stopPropagation(); Player.removeFromQueue(opts.index); } }));
     if (opts.onClick) row.addEventListener('click', opts.onClick);
-    if (opts.draggable) {
-      row.draggable = true;
-      row.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/qreorder', String(opts.index)));
-      row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('drag-over'); });
-      row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
-      row.addEventListener('drop', (e) => { e.preventDefault(); row.classList.remove('drag-over'); const from = e.dataTransfer.getData('text/qreorder'); if (from !== '') Player.reorderQueue(parseInt(from, 10), opts.index); });
-    }
     return row;
   }
   function renderQueue() {
@@ -1226,11 +1225,11 @@
     }
     if (q.userQueue.length) {
       body.appendChild(el('div', { class: 'q-section-title', text: 'Next in queue' }));
-      q.userQueue.forEach((t, i) => body.appendChild(queueRow(t, { removable: true, index: i, draggable: true, onClick: () => Player.playFromQueue(i) })));
+      q.userQueue.forEach((t, i) => body.appendChild(queueRow(t, { removable: true, index: i, type: 'user', onClick: () => Player.playFromQueue(i) })));
     }
     if (q.upNext.length) {
       body.appendChild(el('div', { class: 'q-section-title', text: 'Next up' }));
-      q.upNext.slice(0, 60).forEach((t, i) => body.appendChild(queueRow(t, { onClick: () => Player.playUpNext(i) })));
+      q.upNext.slice(0, 60).forEach((t, i) => body.appendChild(queueRow(t, { index: i, type: 'upNext', onClick: () => Player.playUpNext(i) })));
     }
     if (!q.nowPlaying && !q.userQueue.length && !q.upNext.length) {
       body.appendChild(el('div', { class: 'empty', style: 'padding:40px 10px' }, [
@@ -1240,6 +1239,93 @@
     }
     panel.appendChild(body);
   }
+
+  let queueDrag = null;
+  function setupQueueDnD() {
+    const panel = $('#queue-panel');
+    let placeholder = null;
+    let startY = 0, initialY = 0;
+
+    panel.addEventListener('mousedown', (e) => {
+      const row = e.target.closest('.q-row:not(.current)');
+      if (!row || e.target.closest('button')) return;
+      e.preventDefault();
+      
+      queueDrag = row;
+      const rect = row.getBoundingClientRect();
+      initialY = rect.top;
+      startY = e.clientY;
+      
+      placeholder = el('div', { class: 'q-row-placeholder' });
+      placeholder.style.height = rect.height + 'px';
+      
+      row.parentNode.insertBefore(placeholder, row);
+      row.classList.add('dragging');
+      row.style.width = rect.width + 'px';
+      row.style.left = rect.left + 'px';
+      row.style.top = initialY + 'px';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!queueDrag) return;
+      const dy = e.clientY - startY;
+      queueDrag.style.top = (initialY + dy) + 'px';
+      
+      const siblings = Array.from(queueDrag.parentNode.children).filter(c => 
+        (c.classList.contains('q-row') && !c.classList.contains('dragging') && !c.classList.contains('current')) || 
+        c.classList.contains('q-section-title')
+      );
+      
+      const dragRect = queueDrag.getBoundingClientRect();
+      const dragCenter = dragRect.top + dragRect.height / 2;
+      
+      let insertBeforeEl = null;
+      for (const sib of siblings) {
+        const rect = sib.getBoundingClientRect();
+        if (dragCenter < rect.top + rect.height / 2) { insertBeforeEl = sib; break; }
+      }
+      
+      if (insertBeforeEl) {
+        if (insertBeforeEl !== placeholder.nextSibling) queueDrag.parentNode.insertBefore(placeholder, insertBeforeEl);
+      } else queueDrag.parentNode.appendChild(placeholder);
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!queueDrag) return;
+      const row = queueDrag;
+      queueDrag = null;
+      
+      const parent = row.parentNode;
+      row.classList.remove('dragging');
+      row.style = '';
+      parent.replaceChild(row, placeholder);
+      placeholder = null;
+      
+      const oldType = row.dataset.qtype;
+      const oldIndex = parseInt(row.dataset.qidx, 10);
+      let currentSection = 'user', uIdx = 0, nIdx = 0, newType = 'user', newIndex = 0;
+      
+      for (const child of parent.children) {
+        if (child.classList.contains('q-section-title')) {
+          if (child.textContent === 'Next up') currentSection = 'upNext';
+          if (child.textContent === 'Next in queue') currentSection = 'user';
+        } else if (child.classList.contains('q-row') && !child.classList.contains('current')) {
+          if (child === row) {
+            newType = currentSection;
+            newIndex = currentSection === 'user' ? uIdx : nIdx;
+          } else {
+            if (currentSection === 'user') uIdx++; else nIdx++;
+          }
+        }
+      }
+      
+      if (oldType === 'user' && newType === 'user') Player.reorderQueue(oldIndex, newIndex);
+      else if (oldType === 'upNext' && newType === 'upNext') Player.reorderUpNext(oldIndex, newIndex);
+      else if (oldType === 'upNext' && newType === 'user') Player.promoteToUserQueue(oldIndex, newIndex);
+      else if (oldType === 'user' && newType === 'upNext') Player.demoteToUpNext(oldIndex, newIndex);
+    });
+  }
+
   function setupQueue() {
     const btn = $('#btn-queue');
     const panel = $('#queue-panel');
@@ -1254,6 +1340,7 @@
     Player.subscribe((type) => {
       if ((type === 'queue' || type === 'track') && !panel.classList.contains('hidden')) renderQueue();
     });
+    setupQueueDnD();
   }
 
   // ============================================================
@@ -1522,8 +1609,10 @@
   }
 
   function openPlaylistMenu(e, pl) {
+    const list = pl.paths.map((p) => byPath.get(p)).filter(Boolean);
     showMenu(e.clientX, e.clientY, [
-      { text: 'Play', action: () => { const list = pl.paths.map((p) => byPath.get(p)).filter(Boolean); if (list.length) playList(list, 0); } },
+      { text: 'Play', action: () => { if (list.length) playList(list, 0); } },
+      { text: 'Add to queue', action: () => { if (list.length) { Player.addToQueue(list); toast(list.length + ' added to queue'); } } },
       { text: 'Rename…', action: () => renamePlaylist(pl) },
       { text: 'Delete', action: () => deletePlaylist(pl) },
     ]);

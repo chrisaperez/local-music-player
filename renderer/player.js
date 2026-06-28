@@ -192,6 +192,41 @@ window.Player = (function () {
     load(t, true);
   }
 
+  function reorderUpNext(from, to) {
+    const targetOrderIndexFrom = pos + 1 + from;
+    const targetOrderIndexTo = pos + 1 + to;
+    if (targetOrderIndexFrom >= order.length || targetOrderIndexTo >= order.length) return;
+    const m = order.splice(targetOrderIndexFrom, 1)[0];
+    if (m !== undefined) order.splice(targetOrderIndexTo, 0, m);
+    emit('queue');
+  }
+
+  function promoteToUserQueue(upNextIndex, userQueueIndex) {
+    const targetOrderIndex = pos + 1 + upNextIndex;
+    if (targetOrderIndex >= order.length) return;
+    const trackIndex = order.splice(targetOrderIndex, 1)[0];
+    const track = queue[trackIndex];
+    if (track) {
+      if (userQueueIndex === undefined || userQueueIndex >= userQueue.length) {
+        userQueue.push(track);
+      } else {
+        userQueue.splice(userQueueIndex, 0, track);
+      }
+    }
+    emit('queue');
+  }
+
+  function demoteToUpNext(userQueueIndex, upNextIndex) {
+    if (userQueueIndex < 0 || userQueueIndex >= userQueue.length) return;
+    const track = userQueue.splice(userQueueIndex, 1)[0];
+    if (track) {
+      queue.push(track);
+      const targetOrderIndexTo = pos + 1 + upNextIndex;
+      order.splice(targetOrderIndexTo, 0, queue.length - 1);
+    }
+    emit('queue');
+  }
+  
   function playUpNext(j) {
     const target = pos + 1 + j;
     if (target >= 0 && target < order.length) { pushBack(nowPlaying); pos = target; fromQueue = false; load(ctxCurrent(), true); }
@@ -264,6 +299,7 @@ window.Player = (function () {
     seekFraction, setVolume, getVolume: () => audio.volume,
     setShuffle, toggleShuffle, setRepeat, cycleRepeat, setAutoplay, setRecommender,
     addToQueue, playNext, removeFromQueue, clearQueue, reorderQueue, playFromQueue, playUpNext, getQueue,
+    reorderUpNext, promoteToUserQueue, demoteToUpNext,
     refreshQueue,
     subscribe: (fn) => { listeners.push(fn); return () => listeners.splice(listeners.indexOf(fn), 1); },
     getState: state, current,
