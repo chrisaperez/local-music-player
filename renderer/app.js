@@ -466,6 +466,7 @@
         fab.addEventListener('click', (e) => { e.stopPropagation(); playList(a.tracks, 0); });
         card.appendChild(fab);
         card.addEventListener('click', () => { navigate({ type: 'album', key: a.key }); });
+        card.addEventListener('contextmenu', (e) => { e.preventDefault(); openAlbumMenu(e, a.tracks); });
         a.cardEl = card;
       }
       grid.appendChild(a.cardEl);
@@ -609,6 +610,7 @@
       fab.addEventListener('click', (e) => { e.stopPropagation(); if (list.length) playList(list, 0, pl.id); });
       card.appendChild(fab);
       card.addEventListener('click', () => { navigate({ type: 'playlist', id: pl.id }); });
+      card.addEventListener('contextmenu', (e) => { e.preventDefault(); openPlaylistMenu(e, pl); });
       grid.appendChild(card);
     }
     c.appendChild(grid);
