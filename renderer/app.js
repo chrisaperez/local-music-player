@@ -522,7 +522,7 @@
     const actions = el('div', { class: 'detail-actions' });
     actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(a.tracks, 0) }));
     actions.appendChild(el('button', { class: 'btn', text: 'Add to queue', onclick: () => { Player.addToQueue(a.tracks); toast(a.tracks.length + ' added to queue'); } }));
-    actions.appendChild(el('button', { class: 'btn', text: 'More…', onclick: (e) => openAlbumMenu(e, a.tracks) }));
+    actions.appendChild(el('button', { class: 'btn', text: 'Add to playlist…', onclick: (e) => showMenu(e.clientX, e.clientY, [{ label: 'Add to playlist' }, ...playlistTargets(a.tracks.map((t) => t.path))]) }));
     c.appendChild(actions);
     c.appendChild(trackTable(a.tracks, { columns: ['track', 'titleArt', 'genre', 'duration'], context: 'album' }));
   }
