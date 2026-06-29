@@ -1195,6 +1195,7 @@
     if (opts.index !== undefined) row.dataset.qidx = opts.index;
     if (opts.removable) row.appendChild(el('button', { class: 'q-remove', text: '✕', onclick: (e) => { e.stopPropagation(); Player.removeFromQueue(opts.index); } }));
     if (opts.onClick) row.addEventListener('click', opts.onClick);
+    row.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); openTrackMenu(e, t, null, null); });
     return row;
   }
   function renderQueue() {
@@ -1641,6 +1642,10 @@
     $('#btn-play').addEventListener('click', () => Player.toggle());
     $('#btn-next').addEventListener('click', () => Player.next());
     $('#btn-prev').addEventListener('click', () => Player.prev());
+    $('.np-left').addEventListener('contextmenu', (e) => {
+      const t = Player.getState().current;
+      if (t) { e.preventDefault(); openTrackMenu(e, t, null, null); }
+    });
     $('#btn-shuffle').addEventListener('click', () => { Player.toggleShuffle(); persistPlayerPrefs(); });
     $('#btn-repeat').addEventListener('click', () => { Player.cycleRepeat(); persistPlayerPrefs(); });
 
