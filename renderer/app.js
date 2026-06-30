@@ -208,6 +208,7 @@
   }
   function gotoArtist(t) { navigate({ type: 'artist', name: t.albumArtist || 'Unknown Artist' }); }
   function gotoAlbum(t) { navigate({ type: 'album', key: albumKey(t) }); }
+  function gotoGenre(t) { navigate({ type: 'genre', name: t.genre }); }
 
   // ---- Grouping ----
   function albumKey(t) { return (t.albumArtist || 'Unknown Artist') + SEP + (t.album || 'Unknown Album'); }
@@ -278,6 +279,7 @@
     else if (view.type === 'artists') renderArtists(c);
     else if (view.type === 'album') renderAlbumDetail(c, view.key);
     else if (view.type === 'artist') renderArtistDetail(c, view.name);
+    else if (view.type === 'genre') renderGenre(c, view.name);
     else if (view.type === 'playlists') renderAllPlaylists(c);
     else if (view.type === 'playlist') renderPlaylist(c, view.id);
     else if (view.type === 'search') renderSearch(c, view.query);
@@ -289,6 +291,7 @@
     else if (view.type === 'sync') renderSync(c);
     else if (view.type === 'spotimport') renderSpotImport(c);
     else if (view.type === 'advanced') renderAdvanced(c);
+    else if (view.type === 'tagedit') renderTagEditor(c, view.path);
     syncNavActive();
   }
 
@@ -384,7 +387,8 @@
           td = el('td');
           td.appendChild(linkText(t.album, () => gotoAlbum(t)));
         } else if (col === 'genre') {
-          td = el('td', { class: 'col-genre', text: t.genre });
+          td = el('td', { class: 'col-genre' });
+          if (t.genre) td.appendChild(linkText(t.genre, () => gotoGenre(t)));
         } else if (col === 'year') {
           td = el('td', { class: 'col-year', text: t.year || '' });
         } else if (col === 'duration') {
@@ -530,7 +534,7 @@
   function renderArtistDetail(c, name) {
     const a = getArtists().find((x) => x.name === name);
     if (!a) { view = { type: 'artists' }; return render(); }
-    c.appendChild(detailHeader({ kind: 'Artist', round: true, title: a.name, art: a.art, meta: a.albums.size + ' albums · ' + a.tracks.length + ' songs' }));
+    c.appendChild(detailHeader({ kind: 'Artist', round: true, title: a.name, art: a.art, meta: a.albums.size + ' album' + (a.albums.size === 1 ? '' : 's') + ' · ' + a.tracks.length + ' songs' }));
     const actions = el('div', { class: 'detail-actions' });
     const artistTracks = a.tracks.slice().sort(trackOrder);
     actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(artistTracks, 0) }));
@@ -554,6 +558,26 @@
       }
       c.appendChild(grid);
     }
+  }
+
+  function renderGenre(c, name) {
+    const list = tracks.filter((t) => t.genre === name).sort(trackOrder);
+    if (!list.length) { view = { type: 'songs' }; return render(); }
+    
+    const head = el('div', { class: 'view-head' });
+    const left = el('div');
+    left.appendChild(el('h1', { text: name }));
+    left.appendChild(el('div', { class: 'sub', text: list.length + ' songs' }));
+    head.appendChild(left);
+    c.appendChild(head);
+
+    const actions = el('div', { class: 'detail-actions', style: 'margin-bottom: 24px' });
+    actions.appendChild(el('button', { class: 'play-big', html: ICONS.play, onclick: () => playList(list, 0) }));
+    actions.appendChild(el('button', { class: 'btn', text: 'Shuffle', onclick: () => { Player.setShuffle(true); applyShuffleUI(); playList(list, Math.floor(Math.random() * list.length)); } }));
+    actions.appendChild(el('button', { class: 'btn', text: 'Add to queue', onclick: () => { Player.addToQueue(list); toast(list.length + ' added to queue'); } }));
+    c.appendChild(actions);
+
+    c.appendChild(trackTable(list, { columns: ['index', 'titleArt', 'album', 'year', 'duration'], context: 'genre' }));
   }
 
   // ============================================================
@@ -763,7 +787,7 @@
         const card = el('div', { class: 'card round' });
         card.appendChild(el('img', { class: 'cover', src: a.art ? api.mediaUrl(a.art) : PLACEHOLDER, onerror: imgFallback }));
         card.appendChild(el('div', { class: 'c-title', text: a.name }));
-        card.appendChild(el('div', { class: 'c-sub', text: a.tracks.length + ' songs' }));
+        card.appendChild(el('div', { class: 'c-sub', text: a.albums.size + ' album' + (a.albums.size === 1 ? '' : 's') + ' · ' + a.tracks.length + ' songs' }));
         card.addEventListener('click', () => { navigate({ type: 'artist', name: a.name }); });
         grid.appendChild(card);
       }
@@ -1557,6 +1581,128 @@
   }
 
   // ============================================================
+  //  TAG EDITOR
+  // ============================================================
+  async function renderTagEditor(c, filePath) {
+    // find the track object so we can show art + navigate back
+    const track = filePath ? byPath.get(filePath) : null;
+
+    const head = el('div', { class: 'view-head' });
+    const left = el('div');
+    left.appendChild(el('h1', { text: 'Edit Tags' }));
+    left.appendChild(el('div', { class: 'sub', text: track ? (track.title || track.path.split('/').pop()) : '' }));
+    head.appendChild(left);
+    c.appendChild(head);
+
+    if (!filePath) { c.appendChild(emptyState('No file selected')); return; }
+
+    // loading state
+    const wrap = el('div', { class: 'tagedit-wrap' });
+    c.appendChild(wrap);
+    const spinner = el('div', { class: 'tagedit-loading', text: 'Loading tags…' });
+    wrap.appendChild(spinner);
+
+    let current;
+    try { current = await api.readTags(filePath); }
+    catch (e) { wrap.innerHTML = ''; wrap.appendChild(el('div', { class: 'empty', text: 'Could not read tags: ' + e.message })); return; }
+    wrap.innerHTML = '';
+
+    // art preview
+    const artWrap = el('div', { class: 'tagedit-art-wrap' });
+    const artImg = el('img', { class: 'tagedit-art', src: track && track.artPath ? api.mediaUrl(track.artPath) : PLACEHOLDER, onerror: imgFallback });
+    artWrap.appendChild(artImg);
+    let pendingArtPath = null;
+    const artBtn = el('button', { class: 'btn', text: 'Change art…', style: 'margin-top:8px', onclick: async () => {
+      const p = await api.pickTagArt();
+      if (p) { pendingArtPath = p; artImg.src = 'file://' + p; }
+    }});
+    const artClearBtn = el('button', { class: 'btn', text: 'Remove art', style: 'margin-top:4px', onclick: () => {
+      pendingArtPath = ''; artImg.src = PLACEHOLDER;
+    }});
+    artWrap.appendChild(artBtn);
+    artWrap.appendChild(artClearBtn);
+
+    // fields
+    const FIELDS = [
+      { key: 'title',       label: 'Title' },
+      { key: 'artist',      label: 'Artist' },
+      { key: 'albumArtist', label: 'Album Artist' },
+      { key: 'album',       label: 'Album' },
+      { key: 'year',        label: 'Year',         type: 'number', small: true },
+      { key: 'trackNumber', label: 'Track #',      type: 'number', small: true },
+      { key: 'discNumber',  label: 'Disc #',       type: 'number', small: true },
+      { key: 'genre',       label: 'Genre' },
+      { key: 'comment',     label: 'Comment',      type: 'textarea' },
+    ];
+    const inputs = {};
+    const form = el('div', { class: 'tagedit-form' });
+    for (const f of FIELDS) {
+      const row = el('div', { class: 'tagedit-row' + (f.small ? ' small' : '') });
+      row.appendChild(el('label', { class: 'tagedit-label', text: f.label }));
+      let inp;
+      if (f.type === 'textarea') {
+        inp = el('textarea', { class: 'tagedit-input', rows: 2 });
+        inp.value = current[f.key] || '';
+      } else {
+        inp = el('input', { class: 'tagedit-input', type: f.type === 'number' ? 'number' : 'text' });
+        inp.value = current[f.key] || '';
+        if (f.type === 'number') { inp.min = 0; inp.step = 1; }
+      }
+      inputs[f.key] = inp;
+      row.appendChild(inp);
+      form.appendChild(row);
+    }
+
+    // path display (read-only)
+    const pathRow = el('div', { class: 'tagedit-path', text: filePath });
+    form.appendChild(pathRow);
+
+    // save / cancel
+    let saving = false;
+    const saveBtn = el('button', { class: 'btn primary', text: 'Save', onclick: async () => {
+      if (saving) return;
+      saving = true; saveBtn.textContent = 'Saving…'; saveBtn.disabled = true;
+      const patch = {};
+      for (const f of FIELDS) patch[f.key] = inputs[f.key].value.trim();
+      if (pendingArtPath !== null) patch.artPath = pendingArtPath;
+      try {
+        await api.writeTags(filePath, patch);
+        // update the in-memory track so the UI reflects the change immediately
+        if (track) {
+          track.title       = patch.title       || track.title;
+          track.artist      = patch.artist      || track.artist;
+          track.albumArtist = patch.albumArtist || track.albumArtist;
+          track.album       = patch.album       || track.album;
+          track.year        = patch.year ? parseInt(patch.year, 10) : track.year;
+          track.genre       = patch.genre       || track.genre;
+          cachedAlbums = null; // bust album cache
+        }
+        toast('Tags saved');
+        navigate(-1); // go back
+      } catch (e) {
+        toast('Error: ' + e.message);
+        saveBtn.textContent = 'Save'; saveBtn.disabled = false; saving = false;
+      }
+    }});
+    const cancelBtn = el('button', { class: 'btn', text: 'Cancel', onclick: () => goBack() });
+    const btnRow = el('div', { class: 'tagedit-btns' });
+    btnRow.appendChild(saveBtn);
+    btnRow.appendChild(cancelBtn);
+
+    // layout: art on left, form on right
+    const layout = el('div', { class: 'tagedit-layout' });
+    layout.appendChild(artWrap);
+    const formCol = el('div', { class: 'tagedit-form-col' });
+    formCol.appendChild(form);
+    formCol.appendChild(btnRow);
+    layout.appendChild(formCol);
+    wrap.appendChild(layout);
+
+    // focus the title field
+    setTimeout(() => inputs.title && inputs.title.focus(), 50);
+  }
+
+  // ============================================================
   //  CONTEXT MENUS
   // ============================================================
   function showMenu(x, y, items) {
@@ -1594,6 +1740,8 @@
       { sep: true },
       { text: 'Go to album', action: () => gotoAlbum(t) },
       { text: 'Go to artist', action: () => gotoArtist(t) },
+      { sep: true },
+      { text: 'Edit tags…', action: () => navigate({ type: 'tagedit', path: t.path }) },
     ];
     if (context === 'playlist' && view.type === 'playlist') {
       items.push({ sep: true });

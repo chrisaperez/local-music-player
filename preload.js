@@ -36,6 +36,10 @@ contextBridge.exposeInMainWorld('api', {
 
   pickSpotifyCSV: () => ipcRenderer.invoke('spotify:pickCSV'),
 
+  readTags:  (filePath)        => ipcRenderer.invoke('tags:read',    filePath),
+  writeTags: (filePath, patch) => ipcRenderer.invoke('tags:write',   filePath, patch),
+  pickTagArt: ()               => ipcRenderer.invoke('tags:pickArt'),
+
   // Build a media:// URL for streaming a local file (audio or image).
   mediaUrl: (absPath) => 'media://stream/?p=' + encodeURIComponent(absPath),
 });

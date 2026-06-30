@@ -6,6 +6,7 @@ const protocols = require('./src/main/protocols');
 const library = require('./src/main/library');
 const store = require('./src/main/store');
 const syncserver = require('./src/main/syncserver');
+const tagger = require('./src/main/tagger');
 
 // Privileged scheme registration must happen before the app is ready.
 protocols.registerPrivileged();
@@ -180,6 +181,17 @@ ipcMain.handle('library:rescan', async () => {
   const result = await library.scan(libraryRoot);
   if (syncserver.info().running) syncserver.setTracks(result.tracks);
   return result;
+});
+
+ipcMain.handle('tags:read',  async (_e, filePath) => tagger.readTags(filePath));
+ipcMain.handle('tags:write', async (_e, filePath, patch) => { await tagger.writeTags(filePath, patch); return true; });
+ipcMain.handle('tags:pickArt', async () => {
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose cover art',
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }],
+  });
+  return res.canceled ? null : res.filePaths[0];
 });
 
 ipcMain.handle('sync:info', async () => syncInfo());
